@@ -1,0 +1,159 @@
+auth:
+  login:
+    # Vi du: query hoac stored procedure xac thuc user Landsoft.
+    sql: |
+      /*
+      SELECT TOP 1
+        UserName AS username,
+        StaffName AS display_name,
+        UserName AS landsoft_username,
+        StaffID AS landsoft_user_id,
+        DepartmentID AS department_id,
+        PerName AS role_name
+      FROM dbo.YourUserTable
+      WHERE UserName = ? AND Password = ?
+      */
+      SELECT 1 WHERE 1 = 0
+    parameter_order: [username, password]
+    field_map:
+      username: username
+      display_name: display_name
+      landsoft_username: landsoft_username
+      landsoft_user_id: landsoft_user_id
+      department_id: department_id
+      role_name: role_name
+
+lookups:
+  districts:
+    sql: "SELECT 1 WHERE 1 = 0"
+    parameter_order: []
+    field_map: { code: code, label: label }
+  wards:
+    sql: "SELECT 1 WHERE 1 = 0"
+    parameter_order: []
+    field_map: { code: code, label: label, parent_code: parent_code }
+  property_types:
+    sql: "SELECT 1 WHERE 1 = 0"
+    parameter_order: []
+    field_map: { code: code, label: label }
+  directions:
+    sql: "SELECT 1 WHERE 1 = 0"
+    parameter_order: []
+    field_map: { code: code, label: label }
+  legal_statuses:
+    sql: "SELECT 1 WHERE 1 = 0"
+    parameter_order: []
+    field_map: { code: code, label: label }
+  statuses:
+    sql: "SELECT 1 WHERE 1 = 0"
+    parameter_order: []
+    field_map: { code: code, label: label }
+  sources:
+    sql: "SELECT 1 WHERE 1 = 0"
+    parameter_order: []
+    field_map: { code: code, label: label }
+
+properties:
+  list:
+    sql: |
+      /*
+      EXEC dbo.sp_mobile_property_list ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      */
+      SELECT 1 WHERE 1 = 0
+    parameter_order: [keyword, district, ward, status, price_min, price_max, area_min, area_max, page, page_size]
+    field_map:
+      landsoft_id: landsoft_id
+      code: code
+      title: title
+      district_code: district_code
+      district_name: district_name
+      ward_code: ward_code
+      ward_name: ward_name
+      address: address
+      price: price
+      area: area
+      status_code: status_code
+      status_name: status_name
+      description: description
+  list_total:
+    sql: "SELECT 0 AS total"
+    parameter_order: [keyword, district, ward, status, price_min, price_max, area_min, area_max]
+    total_field: total
+  detail:
+    sql: |
+      /*
+      EXEC dbo.sp_mobile_property_detail ?
+      */
+      SELECT 1 WHERE 1 = 0
+    parameter_order: [landsoft_id]
+    field_map:
+      landsoft_id: landsoft_id
+      code: code
+      title: title
+      district_code: district_code
+      district_name: district_name
+      ward_code: ward_code
+      ward_name: ward_name
+      address: address
+      price: price
+      area: area
+      status_code: status_code
+      status_name: status_name
+      description: description
+      owner_name: owner_name
+      contact_phone: contact_phone
+      legal_status_code: legal_status_code
+      legal_status_name: legal_status_name
+      direction_code: direction_code
+      direction_name: direction_name
+      property_type_code: property_type_code
+      property_type_name: property_type_name
+      source_code: source_code
+      source_name: source_name
+  notes_list:
+    sql: "SELECT 1 WHERE 1 = 0"
+    parameter_order: [landsoft_id]
+    field_map:
+      note_id: note_id
+      created_at: created_at
+      created_by: created_by
+      content: content
+  status_update:
+    sql: |
+      /*
+      EXEC dbo.sp_mobile_property_update_status ?, ?, ?, ?
+      */
+      SELECT 0
+    parameter_order: [landsoft_id, status_code, actor_username, actor_user_id]
+  note_insert:
+    sql: |
+      /*
+      EXEC dbo.sp_mobile_property_add_note ?, ?, ?, ?
+      */
+      SELECT 0
+    parameter_order: [landsoft_id, content, actor_username, actor_user_id]
+  create:
+    sql: |
+      /*
+      EXEC dbo.sp_mobile_property_create ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      */
+      SELECT CAST(NULL AS INT) AS landsoft_id
+    parameter_order:
+      - title
+      - address
+      - district_code
+      - ward_code
+      - property_type_code
+      - status_code
+      - source_code
+      - owner_name
+      - contact_phone
+      - price
+      - area
+      - legal_status_code
+      - direction_code
+      - description
+      - note
+      - actor_username
+      - actor_user_id
+    return_id_field: landsoft_id

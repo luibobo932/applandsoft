@@ -1,0 +1,11 @@
+[
+  {
+    "username": "duy.mobile",
+    "password_hash": "pbkdf2_sha256$120000$replace_this_salt$replace_this_hash",
+    "display_name": "Tran Dang Duy",
+    "landsoft_username": "SKL-473",
+    "landsoft_user_id": 490,
+    "department_id": 6,
+    "role_name": "Chuyen Vien Kinh Doanh"
+  }
+]

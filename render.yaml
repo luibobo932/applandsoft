@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: landsoft-mobile-api
+    runtime: docker
+    rootDir: backend
+    plan: starter
+    autoDeploy: false
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: USE_STUB_GATEWAY
+        value: false
+      - key: SQL_DRIVER
+        value: ODBC Driver 18 for SQL Server
+      - key: SQL_PORT
+        value: 1433
+      - key: SQL_ENCRYPT
+        value: no
+      - key: SQL_TRUST_SERVER_CERT
+        value: yes
