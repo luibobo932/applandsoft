@@ -74,7 +74,6 @@ export function CreatePropertyScreen({
     if (!draft.district_code) return "Thiếu quận";
     if (!draft.ward_code) return "Thiếu phường";
     if (!draft.property_type_code) return "Thiếu loại BĐS";
-    if (!draft.status_code) return "Thiếu trạng thái";
     if (!draft.source_code) return "Thiếu nguồn tin";
     if (!draft.owner_name?.trim()) return "Thiếu tên chủ nhà";
     if (!draft.contact_phone?.trim()) return "Thiếu số điện thoại";
@@ -89,8 +88,14 @@ export function CreatePropertyScreen({
       Alert.alert("Chưa đủ dữ liệu", error);
       return;
     }
-    // Auto-generate title if empty
+    // Auto-set status to "Chờ duyệt" — find by label, fallback to code "2"
     const finalDraft = { ...draft };
+    const choDouyetStatus = lookups.statuses.find(
+      (s) => s.label.toLowerCase().includes("duy") || s.label.toLowerCase().includes("chờ")
+    );
+    finalDraft.status_code = choDouyetStatus?.code ?? lookups.statuses[0]?.code ?? "2";
+
+    // Auto-generate title if empty
     if (!finalDraft.title?.trim()) {
       const parts = [
         finalDraft.address,
@@ -157,14 +162,6 @@ export function CreatePropertyScreen({
             emptyLabel="Chưa chọn"
           />
         ) : null}
-        <SelectField
-          label="Trạng thái"
-          value={draft.status_code}
-          items={lookups.statuses}
-          onChange={(v) => onChangeDraft({ status_code: v })}
-          allowEmpty={false}
-          emptyLabel="Chọn trạng thái"
-        />
         <SelectField
           label="Nguồn tin"
           value={draft.source_code}
