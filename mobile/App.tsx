@@ -43,7 +43,7 @@ const CREATE_DRAFT_KEY = "landsoft_mobile_create_draft";
 const API_BASE_URL_KEY = "landsoft_mobile_api_base_url";
 const DEBUG_AUTO_LOGIN_USER = process.env.EXPO_PUBLIC_DEBUG_AUTO_LOGIN_USER?.trim();
 const DEBUG_AUTO_LOGIN_PASSWORD = process.env.EXPO_PUBLIC_DEBUG_AUTO_LOGIN_PASSWORD?.trim();
-const EMULATOR_API_BASE_URL = "http://10.0.2.2:8000/api/v1";
+const EMULATOR_API_BASE_URL = process.env.EXPO_PUBLIC_DEBUG_EMULATOR_API_BASE_URL?.trim() ?? "";
 
 type SessionState = {
   token: string;
@@ -98,8 +98,8 @@ const emptyFilters: PropertyFilters = {
 };
 
 function getPreferredApiBaseUrl(storedApiBaseUrl?: string | null): string {
-  // Tren emulator (may dev): cho phep URL da luu de tien test, mac dinh 10.0.2.2
-  if (isAndroidEmulatorRuntime()) {
+  // Chi ban dev moi duoc phep doi sang backend laptop tren emulator.
+  if (__DEV__ && EMULATOR_API_BASE_URL && isAndroidEmulatorRuntime()) {
     if (storedApiBaseUrl?.trim()) {
       return setApiBaseUrl(storedApiBaseUrl);
     }
@@ -305,6 +305,8 @@ export default function App() {
       } catch (error) {
         // BUG FIX: only retry with emulator URL when actually running on an emulator
         const shouldRetryOnEmulator =
+          __DEV__ &&
+          Boolean(EMULATOR_API_BASE_URL) &&
           isConnectivityFailure(normalizeApiError(error)) &&
           isAndroidEmulatorRuntime() &&
           requestedApiBaseUrl !== EMULATOR_API_BASE_URL;
@@ -388,6 +390,7 @@ export default function App() {
     return (
       <LoginScreen
         apiBaseUrlValue={apiBaseUrlInput}
+        showApiSettings={__DEV__ && Boolean(EMULATOR_API_BASE_URL)}
         loading={loginLoading}
         onChangeApiBaseUrl={setApiBaseUrlInput}
         onUseEmulatorApiBaseUrl={() => setApiBaseUrlInput(EMULATOR_API_BASE_URL)}

@@ -9,12 +9,14 @@ import { LoginPayload } from "../types";
 
 export function LoginScreen({
   apiBaseUrlValue,
+  showApiSettings,
   loading,
   onChangeApiBaseUrl,
   onUseEmulatorApiBaseUrl,
   onLogin,
 }: {
   apiBaseUrlValue: string;
+  showApiSettings: boolean;
   loading: boolean;
   onChangeApiBaseUrl: (value: string) => void;
   onUseEmulatorApiBaseUrl: () => void;
@@ -31,7 +33,7 @@ export function LoginScreen({
         <Text style={styles.loginDescription}>
           App Android riêng để xem kho nhà và nhập nhà mới trực tiếp vào Landsoft qua backend cloud.
         </Text>
-        <Field label="API backend">
+        {showApiSettings ? <Field label="API backend">
           <TextInput
             style={styles.input}
             autoCapitalize="none"
@@ -52,7 +54,7 @@ export function LoginScreen({
               </Text>
             </View>
           </View>
-        </Field>
+        </Field> : null}
         <Field label="Tên đăng nhập">
           <TextInput
             style={styles.input}

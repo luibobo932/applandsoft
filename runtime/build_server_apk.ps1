@@ -46,7 +46,10 @@ $env:NODE_ENV = "production"
 $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 
 Set-Location $androidDir
-.\gradlew.bat generateCodegenArtifactsFromSchema assembleRelease --no-daemon
+.\gradlew.bat generateCodegenArtifactsFromSchema --no-daemon
+# Bien EXPO_PUBLIC_* khong nam trong input cache cua Gradle, nen buoc bundle phai chay lai.
+.\gradlew.bat :app:createBundleReleaseJsAndAssets --rerun-tasks --no-daemon
+.\gradlew.bat assembleRelease --no-daemon
 
 Write-Host ""
 Write-Host "APK server da build xong:"

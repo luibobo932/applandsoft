@@ -56,7 +56,9 @@ jobs:
         working-directory: mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew generateCodegenArtifactsFromSchema assembleRelease --no-daemon
+          ./gradlew generateCodegenArtifactsFromSchema --no-daemon
+          ./gradlew :app:createBundleReleaseJsAndAssets --rerun-tasks --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       - name: Dat ten APK
         run: cp mobile/android/app/build/outputs/apk/release/app-release.apk landsoft-mobile.apk

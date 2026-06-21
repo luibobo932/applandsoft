@@ -167,7 +167,6 @@ export function CreatePropertyScreen({
           value={draft.source_code}
           items={lookups.sources}
           onChange={(v) => onChangeDraft({ source_code: v })}
-          allowEmpty={false}
           emptyLabel="Chọn nguồn tin"
         />
       </Section>
@@ -179,7 +178,6 @@ export function CreatePropertyScreen({
           value={draft.district_code}
           items={lookups.districts}
           onChange={(v) => onChangeDraft({ district_code: v, ward_code: "" })}
-          allowEmpty={false}
           emptyLabel="Chọn quận"
         />
         <SelectField
@@ -187,7 +185,6 @@ export function CreatePropertyScreen({
           value={draft.ward_code}
           items={wardOptions}
           onChange={(v) => onChangeDraft({ ward_code: v })}
-          allowEmpty={false}
           emptyLabel="Chọn phường"
         />
         <Field label="Tên đường">
@@ -217,7 +214,6 @@ export function CreatePropertyScreen({
           value={draft.property_type_code}
           items={lookups.property_types}
           onChange={(v) => onChangeDraft({ property_type_code: v })}
-          allowEmpty={false}
           emptyLabel="Chọn loại nhà"
         />
         <SelectField
