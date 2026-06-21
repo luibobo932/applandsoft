@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import { Field, SelectField } from "../components/shared";
+import { RangeSlider } from "../components/RangeSlider";
 import { styles } from "../styles";
 import {
   buildRangeLabel,
@@ -24,6 +25,27 @@ import {
   getStatusTone,
 } from "../utils";
 import { LookupCollections, PropertyFilters, PropertySummary } from "../types";
+
+const PRICE_MAX = 500; // ty
+const AREA_MAX = 200; // m2
+
+type QuickRange = { label: string; min?: number; max?: number };
+
+const PRICE_CHIPS: QuickRange[] = [
+  { label: "0 - 3 tỷ", max: 3 },
+  { label: "3 - 5 tỷ", min: 3, max: 5 },
+  { label: "5 - 10 tỷ", min: 5, max: 10 },
+  { label: "10 - 20 tỷ", min: 10, max: 20 },
+  { label: "20+ tỷ", min: 20 },
+];
+
+const AREA_CHIPS: QuickRange[] = [
+  { label: "< 50 m²", max: 50 },
+  { label: "50 - 80 m²", min: 50, max: 80 },
+  { label: "80 - 120 m²", min: 80, max: 120 },
+  { label: "120 - 200 m²", min: 120, max: 200 },
+  { label: "200+ m²", min: 200 },
+];
 
 export function PropertyListScreen({
   filters,
@@ -61,6 +83,7 @@ export function PropertyListScreen({
       district: "",
       ward: "",
       status: "",
+      property_type: "",
       price_min: undefined,
       price_max: undefined,
       area_min: undefined,
@@ -74,6 +97,7 @@ export function PropertyListScreen({
   );
   const activeFilterChips = [
     filters.keyword?.trim() ? "Từ khóa: " + filters.keyword.trim() : "",
+    filters.property_type ? pickLabel(lookups.property_types, filters.property_type) : "",
     filters.district ? pickLabel(lookups.districts, filters.district) : "",
     filters.ward ? pickLabel(lookups.wards, filters.ward) : "",
     filters.status ? pickLabel(lookups.statuses, filters.status) : "",
@@ -199,112 +223,173 @@ export function PropertyListScreen({
                 <View style={styles.filterPanelHeader}>
                   <Text style={styles.filterPanelTitle}>Bộ lọc chi tiết</Text>
                   {activeFilterCount > 0 ? (
-                    <Pressable onPress={resetFilters}>
+                    <Pressable onPress={() => { resetFilters(); void onReload(); }}>
                       <Text style={styles.filterResetText}>Xóa nhanh</Text>
                     </Pressable>
                   ) : null}
                 </View>
+
+                <Text style={styles.filterGroupLabel}>Khu vực</Text>
                 <SelectField
-                  label="Quận"
+                  label="Quận / Huyện"
                   value={filters.district ?? ""}
                   items={lookups.districts}
-                  onChange={(value) => {
-                    onChangeFilter({ district: value, ward: "" });
-                    void onReload();
-                  }}
+                  onChange={(value) => onChangeFilter({ district: value, ward: "" })}
                   emptyLabel="Tất cả quận"
                 />
                 <SelectField
-                  label="Phường"
+                  label="Phường / Xã"
                   value={filters.ward ?? ""}
                   items={wardOptions}
-                  onChange={(value) => {
-                    onChangeFilter({ ward: value });
-                    void onReload();
-                  }}
+                  onChange={(value) => onChangeFilter({ ward: value })}
                   emptyLabel="Tất cả phường"
                 />
+
+                <Text style={styles.filterGroupLabel}>Loại nhà</Text>
+                <View style={styles.typeToggleRow}>
+                  <Pressable
+                    style={[styles.typeToggleButton, !filters.property_type && styles.typeToggleButtonActive]}
+                    onPress={() => onChangeFilter({ property_type: "" })}
+                  >
+                    <Text style={[styles.typeToggleText, !filters.property_type && styles.typeToggleTextActive]}>
+                      Tất cả
+                    </Text>
+                  </Pressable>
+                  {lookups.property_types.map((type) => {
+                    const active = filters.property_type === type.code;
+                    return (
+                      <Pressable
+                        key={type.code}
+                        style={[styles.typeToggleButton, active && styles.typeToggleButtonActive]}
+                        onPress={() => onChangeFilter({ property_type: active ? "" : type.code })}
+                      >
+                        <Text style={[styles.typeToggleText, active && styles.typeToggleTextActive]}>
+                          {type.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.filterGroupLabel}>Trạng thái</Text>
                 <SelectField
                   label="Trạng thái"
                   value={filters.status ?? ""}
                   items={lookups.statuses}
-                  onChange={(value) => {
-                    onChangeFilter({ status: value });
-                    void onReload();
-                  }}
+                  onChange={(value) => onChangeFilter({ status: value })}
                   emptyLabel="Tất cả trạng thái"
                 />
-                <Text style={styles.filterGroupLabel}>Khoảng giá (tỷ)</Text>
+
+                <Text style={styles.filterGroupLabel}>Giá (tỷ đồng)</Text>
+                <RangeSlider
+                  min={0}
+                  max={PRICE_MAX}
+                  step={1}
+                  low={filters.price_min ?? 0}
+                  high={filters.price_max ?? PRICE_MAX}
+                  onChange={(low, high) =>
+                    onChangeFilter({
+                      price_min: low > 0 ? low : undefined,
+                      price_max: high < PRICE_MAX ? high : undefined,
+                    })
+                  }
+                />
+                <Text style={styles.rangeValueLabel}>
+                  Khoảng giá: {filters.price_min ?? 0} – {filters.price_max != null ? filters.price_max : `${PRICE_MAX}+`} tỷ
+                </Text>
+                <View style={styles.quickChipRow}>
+                  {PRICE_CHIPS.map((chip) => {
+                    const active =
+                      (filters.price_min ?? undefined) === chip.min &&
+                      (filters.price_max ?? undefined) === chip.max;
+                    return (
+                      <Pressable
+                        key={chip.label}
+                        style={[styles.quickChip, active && styles.quickChipActive]}
+                        onPress={() =>
+                          onChangeFilter(
+                            active
+                              ? { price_min: undefined, price_max: undefined }
+                              : { price_min: chip.min, price_max: chip.max }
+                          )
+                        }
+                      >
+                        <Text style={[styles.quickChipText, active && styles.quickChipTextActive]}>{chip.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.filterGroupLabel}>Diện tích (m²)</Text>
+                <RangeSlider
+                  min={0}
+                  max={AREA_MAX}
+                  step={5}
+                  low={filters.area_min ?? 0}
+                  high={filters.area_max ?? AREA_MAX}
+                  onChange={(low, high) =>
+                    onChangeFilter({
+                      area_min: low > 0 ? low : undefined,
+                      area_max: high < AREA_MAX ? high : undefined,
+                    })
+                  }
+                />
                 <View style={styles.filterRangeRow}>
                   <View style={styles.filterRangeField}>
-                    <Field label="Từ">
+                    <Field label="Từ (m²)">
                       <TextInput
                         style={styles.input}
                         keyboardType="decimal-pad"
-                        value={formatFilterNumber(filters.price_min)}
+                        value={formatFilterNumber(filters.area_min)}
                         onChangeText={(value) =>
-                          onChangeFilter({
-                            price_min: value.trim() ? parseNumberInput(value) : undefined,
-                          })
+                          onChangeFilter({ area_min: value.trim() ? parseNumberInput(value) : undefined })
                         }
                         placeholder="0"
                       />
                     </Field>
                   </View>
                   <View style={styles.filterRangeField}>
-                    <Field label="Đến">
-                      <TextInput
-                        style={styles.input}
-                        keyboardType="decimal-pad"
-                        value={formatFilterNumber(filters.price_max)}
-                        onChangeText={(value) =>
-                          onChangeFilter({
-                            price_max: value.trim() ? parseNumberInput(value) : undefined,
-                          })
-                        }
-                        placeholder="50"
-                      />
-                    </Field>
-                  </View>
-                </View>
-                <Text style={styles.filterGroupLabel}>Diện tích (m²)</Text>
-                <View style={styles.filterRangeRow}>
-                  <View style={styles.filterRangeField}>
-                    <Field label="Từ">
-                      <TextInput
-                        style={styles.input}
-                        keyboardType="decimal-pad"
-                        value={formatFilterNumber(filters.area_min)}
-                        onChangeText={(value) =>
-                          onChangeFilter({
-                            area_min: value.trim() ? parseNumberInput(value) : undefined,
-                          })
-                        }
-                        placeholder="30"
-                      />
-                    </Field>
-                  </View>
-                  <View style={styles.filterRangeField}>
-                    <Field label="Đến">
+                    <Field label="Đến (m²)">
                       <TextInput
                         style={styles.input}
                         keyboardType="decimal-pad"
                         value={formatFilterNumber(filters.area_max)}
                         onChangeText={(value) =>
-                          onChangeFilter({
-                            area_max: value.trim() ? parseNumberInput(value) : undefined,
-                          })
+                          onChangeFilter({ area_max: value.trim() ? parseNumberInput(value) : undefined })
                         }
-                        placeholder="120"
+                        placeholder="200"
                       />
                     </Field>
                   </View>
                 </View>
+                <View style={styles.quickChipRow}>
+                  {AREA_CHIPS.map((chip) => {
+                    const active =
+                      (filters.area_min ?? undefined) === chip.min &&
+                      (filters.area_max ?? undefined) === chip.max;
+                    return (
+                      <Pressable
+                        key={chip.label}
+                        style={[styles.quickChip, active && styles.quickChipActive]}
+                        onPress={() =>
+                          onChangeFilter(
+                            active
+                              ? { area_min: undefined, area_max: undefined }
+                              : { area_min: chip.min, area_max: chip.max }
+                          )
+                        }
+                      >
+                        <Text style={[styles.quickChipText, active && styles.quickChipTextActive]}>{chip.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
                 <View style={styles.filterButtonRow}>
                   <Pressable style={styles.primaryButtonInline} onPress={() => void onReload()}>
-                    <Text style={styles.primaryButtonText}>Lọc kho hàng</Text>
+                    <Text style={styles.primaryButtonText}>Áp dụng bộ lọc</Text>
                   </Pressable>
-                  <Pressable style={styles.secondaryButtonInline} onPress={resetFilters}>
+                  <Pressable style={styles.secondaryButtonInline} onPress={() => { resetFilters(); void onReload(); }}>
                     <Text style={styles.secondaryButtonText}>Xóa bộ lọc</Text>
                   </Pressable>
                 </View>

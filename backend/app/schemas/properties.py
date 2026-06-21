@@ -51,6 +51,7 @@ class PropertyFilters(BaseModel):
     district: str | None = None
     ward: str | None = None
     status: str | None = None
+    property_type: str | None = None
     price_min: float | None = None
     price_max: float | None = None
     area_min: float | None = None

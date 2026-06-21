@@ -159,6 +159,11 @@ class SqlLandsoftGateway:
             clauses.append("AND bc.MaTT = ?")
             params.append(int(status))
 
+        property_type = (filters.get("property_type") or "").strip()
+        if property_type:
+            clauses.append("AND bc.MaLBDS = ?")
+            params.append(int(property_type))
+
         if filters.get("price_min") is not None:
             clauses.append("AND bc.ThanhTien >= ?")
             params.append(float(filters["price_min"]) * 1_000_000_000)

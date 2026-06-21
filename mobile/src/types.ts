@@ -85,6 +85,7 @@ export type PropertyFilters = {
   district?: string;
   ward?: string;
   status?: string;
+  property_type?: string;
   price_min?: number;
   price_max?: number;
   area_min?: number;
