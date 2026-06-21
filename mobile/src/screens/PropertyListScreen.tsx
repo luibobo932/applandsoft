@@ -32,8 +32,10 @@ export function PropertyListScreen({
   lookups,
   loading,
   refreshing,
+  loadingMore,
   onChangeFilter,
   onReload,
+  onLoadMore,
   onOpenProperty,
   onQuickViewPhone,
   onGoCreate,
@@ -44,8 +46,10 @@ export function PropertyListScreen({
   lookups: LookupCollections;
   loading: boolean;
   refreshing: boolean;
+  loadingMore: boolean;
   onChangeFilter: (patch: Partial<PropertyFilters>) => void;
   onReload: () => Promise<void>;
+  onLoadMore: () => void;
   onOpenProperty: (landsoftId: number) => void;
   onQuickViewPhone: (landsoftId: number) => Promise<void>;
   onGoCreate: () => void;
@@ -91,6 +95,29 @@ export function PropertyListScreen({
         keyExtractor={(item) => item.landsoft_id.toString()}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onReload()} />}
         contentContainerStyle={items.length === 0 ? styles.marketListContentEmpty : styles.marketListContent}
+        onEndReached={() => onLoadMore()}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          items.length > 0 ? (
+            <View style={styles.listFooter}>
+              {loadingMore ? (
+                <>
+                  <ActivityIndicator size="small" color="#F37021" />
+                  <Text style={styles.listFooterText}>Đang tải thêm...</Text>
+                </>
+              ) : items.length >= totalCount ? (
+                <Text style={styles.listFooterText}>Đã hiện hết {formatCount(totalCount)} căn</Text>
+              ) : (
+                <Pressable style={styles.loadMoreButton} onPress={() => onLoadMore()}>
+                  <Feather name="chevron-down" size={16} color="#F37021" />
+                  <Text style={styles.loadMoreButtonText}>
+                    Tải thêm ({formatCount(items.length)}/{formatCount(totalCount)})
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          ) : null
+        }
         ListHeaderComponent={
           <>
             <View style={styles.marketOverview}>
@@ -290,7 +317,7 @@ export function PropertyListScreen({
                 <Text style={styles.listHeaderCount}>
                   {loading ? "Đang tải..." : `${formatCount(items.length)}/${formatCount(totalCount)} mục`}
                 </Text>
-                {loading ? <ActivityIndicator size="small" color="#F37021" /> : null}
+                {loading || loadingMore ? <ActivityIndicator size="small" color="#F37021" /> : null}
               </View>
             </View>
           </>

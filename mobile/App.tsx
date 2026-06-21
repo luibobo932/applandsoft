@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, SafeAreaView, Text } from "react-native";
 
 import {
@@ -94,7 +94,7 @@ const emptyFilters: PropertyFilters = {
   area_min: undefined,
   area_max: undefined,
   page: 1,
-  page_size: 2000,
+  page_size: 50,
 };
 
 function getPreferredApiBaseUrl(storedApiBaseUrl?: string | null): string {
@@ -121,6 +121,7 @@ export default function App() {
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("properties");
   const [propertyLoading, setPropertyLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
   const [draft, setDraft] = useState<PropertyCreatePayload>(emptyDraft);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -241,6 +242,39 @@ export default function App() {
     },
     []
   );
+
+  // Theo doi so can da tai de tinh trang ke tiep ma khong can dua properties vao deps
+  const loadedCountRef = useRef(0);
+  useEffect(() => {
+    loadedCountRef.current = properties.length;
+  }, [properties.length]);
+
+  // Cuon toi dau tai toi do: lay trang ke tiep va noi vao danh sach
+  const handleLoadMore = useCallback(async () => {
+    if (!session || loadingMore || propertyLoading) {
+      return;
+    }
+    const loaded = loadedCountRef.current;
+    if (loaded === 0 || loaded >= propertyTotal) {
+      return;
+    }
+    const pageSize = filters.page_size ?? 50;
+    const nextPage = Math.floor(loaded / pageSize) + 1;
+    setLoadingMore(true);
+    try {
+      const response = await fetchProperties(session.token, { ...filters, page: nextPage });
+      setProperties((prev) => {
+        const seen = new Set(prev.map((item) => item.landsoft_id));
+        const fresh = response.items.filter((item) => !seen.has(item.landsoft_id));
+        return [...prev, ...fresh];
+      });
+      setPropertyTotal(response.total);
+    } catch (error) {
+      Alert.alert("Không tải thêm được", normalizeApiError(error));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [filters, loadingMore, propertyLoading, propertyTotal, session]);
 
   const loadActivity = useCallback(async (token: string) => {
     setActivityLoading(true);
@@ -392,8 +426,10 @@ export default function App() {
           lookups={lookups}
           loading={propertyLoading}
           refreshing={propertyLoading}
+          loadingMore={loadingMore}
           onChangeFilter={handleFiltersChange}
           onReload={handleReloadProperties}
+          onLoadMore={handleLoadMore}
           onOpenProperty={(landsoftId) => setSelectedPropertyId(landsoftId)}
           onQuickViewPhone={handleQuickViewPhone}
           onGoCreate={() => setActiveTab("create")}

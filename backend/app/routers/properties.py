@@ -27,7 +27,7 @@ def list_properties(
     area_min: float | None = None,
     area_max: float | None = None,
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
+    page_size: int = Query(default=20, ge=1, le=5000),
     _user=Depends(current_user),
 ) -> PagedPropertiesResponse:
     filters = PropertyFilters(

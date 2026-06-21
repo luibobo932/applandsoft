@@ -381,7 +381,7 @@ export const styles = StyleSheet.create({
   marketListContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 24,
+    paddingBottom: 110,
   },
   marketListContentEmpty: {
     flexGrow: 1,
@@ -1657,5 +1657,32 @@ export const styles = StyleSheet.create({
     color: "#94A3B8",
     paddingBottom: 10,
     fontWeight: "500",
+  },
+  listFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 18,
+  },
+  listFooterText: {
+    fontSize: 13,
+    color: "#8B9AB0",
+  },
+  loadMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#F3702155",
+    backgroundColor: "#FFF3EC",
+  },
+  loadMoreButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#F37021",
   },
 });
