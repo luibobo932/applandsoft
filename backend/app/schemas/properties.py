@@ -41,6 +41,8 @@ class PropertyDetail(PropertySummary):
     property_type_name: str | None = None
     source_code: str | None = None
     source_name: str | None = None
+    created_at: datetime | None = None
+    created_by: str | None = None
     notes: list[PropertyNote] = Field(default_factory=list)
 
 

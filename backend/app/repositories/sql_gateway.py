@@ -81,7 +81,9 @@ class SqlLandsoftGateway:
             CAST(bc.MaLBDS AS nvarchar(20)) AS property_type_code,
             lbds.TenLBDS AS property_type_name,
             CAST(bc.MaNguon AS nvarchar(20)) AS source_code,
-            nguon.TenNguon AS source_name
+            nguon.TenNguon AS source_name,
+            bc.NgayDK AS created_at,
+            COALESCE(NULLIF(nvkd.HoTen, N''), NULLIF(nvkd.MaSo, N''), N'') AS created_by
         FROM dbo.mglbcBanChoThue bc
         LEFT JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
         LEFT JOIN dbo.Xa x ON x.MaXa = bc.MaXa
@@ -92,6 +94,7 @@ class SqlLandsoftGateway:
         LEFT JOIN dbo.PhapLy pl ON pl.MaPL = bc.MaPL
         LEFT JOIN dbo.PhuongHuong ph ON ph.MaPhuongHuong = bc.MaHuong
         LEFT JOIN dbo.mglNguon nguon ON nguon.MaNguon = bc.MaNguon
+        LEFT JOIN dbo.NhanVien nvkd ON nvkd.MaNV = bc.MaNVKD
         WHERE bc.MaBC = ?
     """
 
@@ -334,7 +337,7 @@ class SqlLandsoftGateway:
 
     def list_properties(self, filters: dict) -> tuple[list[dict], int]:
         page = max(int(filters.get("page", 1)), 1)
-        page_size = max(min(int(filters.get("page_size", 20)), 100), 1)
+        page_size = max(min(int(filters.get("page_size", 20)), 5000), 1)
         offset = (page - 1) * page_size
         extra_where, where_params = self._build_where_clause(filters)
 

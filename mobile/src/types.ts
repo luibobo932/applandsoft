@@ -75,6 +75,8 @@ export type PropertyDetail = PropertySummary & {
   property_type_name?: string | null;
   source_code?: string | null;
   source_name?: string | null;
+  created_at?: string | null;
+  created_by?: string | null;
   notes: PropertyNote[];
 };
 

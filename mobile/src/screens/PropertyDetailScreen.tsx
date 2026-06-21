@@ -168,6 +168,8 @@ export function PropertyDetailScreen({
     { icon: "phone" as const, label: "Điện thoại", value: cleanDisplayText(property.contact_phone, "Chưa rõ") },
     { icon: "radio" as const, label: "Nguồn tin", value: cleanDisplayText(property.source_name, "Chưa rõ") },
     { icon: "map" as const, label: "Địa chỉ", value: cleanDisplayText(property.address, "Chưa rõ") },
+    { icon: "user-plus" as const, label: "Người nhập", value: cleanDisplayText(property.created_by, "Chưa rõ") },
+    { icon: "calendar" as const, label: "Ngày nhập", value: formatDateTime(property.created_at) || "Chưa rõ" },
   ];
 
   return (

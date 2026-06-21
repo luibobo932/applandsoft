@@ -94,7 +94,7 @@ const emptyFilters: PropertyFilters = {
   area_min: undefined,
   area_max: undefined,
   page: 1,
-  page_size: 20,
+  page_size: 2000,
 };
 
 function getPreferredApiBaseUrl(storedApiBaseUrl?: string | null): string {
