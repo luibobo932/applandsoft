@@ -306,51 +306,48 @@ export function PropertyListScreen({
           const statusTone = getStatusTone(item.status_name);
           const ownerName = cleanDisplayText(item.owner_name, "");
           const phone = cleanDisplayText(item.contact_phone, "");
-          const district = cleanDisplayText(item.district_name, "");
           const dims =
             item.width && item.width > 0 && item.length && item.length > 0
-              ? `${item.width}x${item.length}m`
+              ? `${item.width}×${item.length}m`
               : item.area && item.area > 0
               ? `${item.area}m²`
               : null;
-          const price = formatMoney(item.price);
-          const mainParts = [
-            cleanDisplayText(item.title, cleanDisplayText(item.address, item.code)),
-            district,
-            dims ? `DT:(${dims})` : null,
-            `giá ${price}`,
-          ].filter(Boolean);
-          const contactLine = [ownerName, phone].filter(Boolean).join(": ");
+          const address = cleanDisplayText(item.address, "");
+          const district = cleanDisplayText(item.district_name, "");
+          const ward = cleanDisplayText(item.ward_name, "");
+          const location = [district, ward].filter(Boolean).join(" · ");
+          const locationLine = [address, location].filter(Boolean).join(", ")
+            || cleanDisplayText(item.title, item.code);
           return (
-            <Pressable style={styles.compactCard} onPress={() => onOpenProperty(item.landsoft_id)}>
-              <View style={styles.compactCardBody}>
-                <Text style={styles.compactCardMain} numberOfLines={2}>
-                  {mainParts.join(" ")}
-                </Text>
-                <View style={styles.compactCardContactRow}>
-                  <Text style={styles.compactCardContact} numberOfLines={1}>
-                    {contactLine || "Chưa có liên hệ"}
+            <Pressable style={styles.propCard} onPress={() => onOpenProperty(item.landsoft_id)}>
+              {/* Row 1: giá + dims + status */}
+              <View style={styles.propCardRow1}>
+                <Text style={styles.propCardPrice}>{formatMoney(item.price)}</Text>
+                {dims ? <Text style={styles.propCardDims}>{dims}</Text> : null}
+                <View style={[styles.propCardBadge, { backgroundColor: statusTone.backgroundColor, borderColor: statusTone.borderColor }]}>
+                  <Text style={[styles.propCardBadgeText, { color: statusTone.color }]}>
+                    {cleanDisplayText(item.status_name, "?")}
                   </Text>
-                  {phone ? (
-                    <Pressable
-                      style={styles.compactCardPhoneBtn}
-                      onPress={() => void onQuickViewPhone(item.landsoft_id)}
-                      hitSlop={8}
-                    >
-                      <Feather name="phone" size={14} color="#F37021" />
-                    </Pressable>
-                  ) : null}
                 </View>
               </View>
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: statusTone.backgroundColor, borderColor: statusTone.borderColor, alignSelf: "flex-start" },
-                ]}
-              >
-                <Text style={[styles.statusBadgeText, { color: statusTone.color }]}>
-                  {cleanDisplayText(item.status_name, "?")}
+              {/* Row 2: địa chỉ */}
+              <Text style={styles.propCardAddress} numberOfLines={2}>{locationLine}</Text>
+              {/* Row 3: chủ nhà + SĐT */}
+              <View style={styles.propCardContactRow}>
+                <Feather name="user" size={12} color="#8B9AB0" />
+                <Text style={styles.propCardContact} numberOfLines={1}>
+                  {ownerName || "Chưa có chủ nhà"}
+                  {phone ? `  ·  ${phone}` : ""}
                 </Text>
+                {phone ? (
+                  <Pressable
+                    style={styles.propCardPhoneBtn}
+                    onPress={() => void onQuickViewPhone(item.landsoft_id)}
+                    hitSlop={10}
+                  >
+                    <Feather name="phone-call" size={13} color="#F37021" />
+                  </Pressable>
+                ) : null}
               </View>
             </Pressable>
           );

@@ -18,7 +18,7 @@ import { LookupCollections, PropertyCreatePayload } from "../types";
 
 const CREATE_DRAFT_KEY = "landsoft_mobile_create_draft";
 
-const emptyDraft: PropertyCreatePayload = {
+export const emptyDraft: PropertyCreatePayload = {
   title: "",
   address: "",
   district_code: "",
@@ -33,11 +33,9 @@ const emptyDraft: PropertyCreatePayload = {
   area: 0,
   width: 0,
   length: 0,
-  floors: 0,
-  bedrooms: 0,
-  bathrooms: 0,
   legal_status_code: "",
   direction_code: "",
+  grade_code: "",
   description: "",
   note: "",
   listing_type: "ban",
@@ -59,26 +57,27 @@ export function CreatePropertyScreen({
   onSubmitSuccess: () => Promise<void>;
 }) {
   const [submitting, setSubmitting] = useState(false);
+
   const wardOptions = useMemo(
-    () => lookups.wards.filter((item) => !draft.district_code || item.parent_code === draft.district_code),
+    () => lookups.wards.filter((w) => !draft.district_code || w.parent_code === draft.district_code),
     [draft.district_code, lookups.wards]
   );
-  const quickChecks = [
-    { label: "Khu vực", done: Boolean(draft.district_code && draft.ward_code) },
+
+  const readyChecks = [
+    { label: "Vị trí", done: Boolean(draft.district_code && draft.ward_code) },
     { label: "Giá", done: Boolean(draft.price && draft.price > 0) },
-    { label: "Liên hệ", done: Boolean(draft.owner_name.trim() && draft.contact_phone.trim()) },
+    { label: "Chủ nhà", done: Boolean(draft.owner_name?.trim() && draft.contact_phone?.trim()) },
   ];
 
   const validate = (): string | null => {
-    if (!draft.title.trim()) return "Thiếu tiêu đề căn";
-    if (!draft.address.trim()) return "Thiếu địa chỉ";
+    if (!draft.address?.trim()) return "Thiếu địa chỉ (số nhà, đường)";
     if (!draft.district_code) return "Thiếu quận";
     if (!draft.ward_code) return "Thiếu phường";
-    if (!draft.property_type_code) return "Thiếu loại nhà";
+    if (!draft.property_type_code) return "Thiếu loại BĐS";
     if (!draft.status_code) return "Thiếu trạng thái";
     if (!draft.source_code) return "Thiếu nguồn tin";
-    if (!draft.owner_name.trim()) return "Thiếu tên chủ nhà";
-    if (!draft.contact_phone.trim()) return "Thiếu số điện thoại";
+    if (!draft.owner_name?.trim()) return "Thiếu tên chủ nhà";
+    if (!draft.contact_phone?.trim()) return "Thiếu số điện thoại";
     if (!draft.price || draft.price <= 0) return "Giá phải lớn hơn 0";
     if (!draft.area || draft.area <= 0) return "Diện tích phải lớn hơn 0";
     return null;
@@ -90,9 +89,18 @@ export function CreatePropertyScreen({
       Alert.alert("Chưa đủ dữ liệu", error);
       return;
     }
+    // Auto-generate title if empty
+    const finalDraft = { ...draft };
+    if (!finalDraft.title?.trim()) {
+      const parts = [
+        finalDraft.address,
+        finalDraft.district_code ? lookups.districts.find(d => d.code === finalDraft.district_code)?.label : null,
+      ].filter(Boolean);
+      finalDraft.title = parts.join(", ");
+    }
     setSubmitting(true);
     try {
-      const result = await createProperty(token, draft);
+      const result = await createProperty(token, finalDraft);
       Alert.alert("Đã tạo nhà mới", result.message);
       onChangeDraft(emptyDraft);
       await AsyncStorage.removeItem(CREATE_DRAFT_KEY);
@@ -105,36 +113,30 @@ export function CreatePropertyScreen({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
-      <View style={styles.formHeroCard}>
-        <Text style={styles.formHeroEyebrow}>NHẬP NHÀ MỚI</Text>
-        <Text style={styles.formHeroTitle}>Điền nhanh các thông tin cốt lõi trước khi đẩy vào Landsoft</Text>
-        <Text style={styles.formHeroDescription}>
-          Form được lưu tạm trên máy. Khi mất mạng, nội dung anh đang nhập vẫn được giữ lại.
-        </Text>
-        <View style={styles.formHeroChipRow}>
-          {quickChecks.map((item) => (
-            <View
-              key={item.label}
-              style={[styles.formHeroChip, item.done ? styles.formHeroChipDone : styles.formHeroChipPending]}
-            >
-              <Text style={[styles.formHeroChipText, item.done ? styles.formHeroChipTextDone : styles.formHeroChipTextPending]}>
-                {item.done ? "Đã có " : "Thiếu "}
-                {item.label}
-              </Text>
-            </View>
-          ))}
-        </View>
+    <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+
+      {/* Status chips */}
+      <View style={styles.createReadyRow}>
+        {readyChecks.map((item) => (
+          <View key={item.label} style={[styles.createReadyChip, item.done && styles.createReadyChipDone]}>
+            <Feather name={item.done ? "check-circle" : "circle"} size={12} color={item.done ? "#16A34A" : "#94A3B8"} />
+            <Text style={[styles.createReadyChipText, item.done && styles.createReadyChipTextDone]}>{item.label}</Text>
+          </View>
+        ))}
+        {savingDraft ? (
+          <Text style={styles.createSavingText}>Đang lưu...</Text>
+        ) : null}
       </View>
 
-      <Section title="Loại giao dịch">
+      {/* SECTION: Loại tin */}
+      <Section title="Loại tin">
         <View style={styles.listingTypeRow}>
           <Pressable
             style={[styles.listingTypeButton, draft.listing_type === "ban" && styles.listingTypeButtonActive]}
             onPress={() => onChangeDraft({ listing_type: "ban" })}
           >
             <Text style={[styles.listingTypeButtonText, draft.listing_type === "ban" && styles.listingTypeButtonTextActive]}>
-              <Feather name="tag" size={14} /> Bán
+              Cần bán
             </Text>
           </Pressable>
           <Pressable
@@ -142,42 +144,44 @@ export function CreatePropertyScreen({
             onPress={() => onChangeDraft({ listing_type: "thue" })}
           >
             <Text style={[styles.listingTypeButtonText, draft.listing_type === "thue" && styles.listingTypeButtonTextActive]}>
-              <Feather name="key" size={14} /> Cho thuê
+              Cho thuê
             </Text>
           </Pressable>
         </View>
+        {lookups.grades.length > 0 ? (
+          <SelectField
+            label="Cấp độ"
+            value={draft.grade_code ?? ""}
+            items={lookups.grades}
+            onChange={(v) => onChangeDraft({ grade_code: v })}
+            emptyLabel="Chưa chọn"
+          />
+        ) : null}
+        <SelectField
+          label="Trạng thái"
+          value={draft.status_code}
+          items={lookups.statuses}
+          onChange={(v) => onChangeDraft({ status_code: v })}
+          allowEmpty={false}
+          emptyLabel="Chọn trạng thái"
+        />
+        <SelectField
+          label="Nguồn tin"
+          value={draft.source_code}
+          items={lookups.sources}
+          onChange={(v) => onChangeDraft({ source_code: v })}
+          allowEmpty={false}
+          emptyLabel="Chọn nguồn tin"
+        />
       </Section>
 
-      <Section title="Thông tin chính">
-        <Field label="Tiêu đề">
-          <TextInput
-            style={styles.input}
-            value={draft.title}
-            onChangeText={(value) => onChangeDraft({ title: value })}
-            placeholder="Ví dụ: Nhà phố Phan Xích Long"
-          />
-        </Field>
-        <Field label="Địa chỉ">
-          <TextInput
-            style={styles.input}
-            value={draft.address}
-            onChangeText={(value) => onChangeDraft({ address: value })}
-            placeholder="Số nhà, đường, phường..."
-          />
-        </Field>
-        <Field label="Tên đường">
-          <TextInput
-            style={styles.input}
-            value={draft.street_name ?? ""}
-            onChangeText={(value) => onChangeDraft({ street_name: value })}
-            placeholder="Ví dụ: Nguyễn Đình Chiểu"
-          />
-        </Field>
+      {/* SECTION: Vị trí */}
+      <Section title="Vị trí">
         <SelectField
           label="Quận"
           value={draft.district_code}
           items={lookups.districts}
-          onChange={(value) => onChangeDraft({ district_code: value, ward_code: "" })}
+          onChange={(v) => onChangeDraft({ district_code: v, ward_code: "" })}
           allowEmpty={false}
           emptyLabel="Chọn quận"
         />
@@ -185,144 +189,146 @@ export function CreatePropertyScreen({
           label="Phường"
           value={draft.ward_code}
           items={wardOptions}
-          onChange={(value) => onChangeDraft({ ward_code: value })}
+          onChange={(v) => onChangeDraft({ ward_code: v })}
           allowEmpty={false}
           emptyLabel="Chọn phường"
         />
+        <Field label="Tên đường">
+          <TextInput
+            style={styles.input}
+            value={draft.street_name ?? ""}
+            onChangeText={(v) => onChangeDraft({ street_name: v })}
+            placeholder="Ví dụ: An Bình"
+            returnKeyType="next"
+          />
+        </Field>
+        <Field label="Số nhà / Địa chỉ">
+          <TextInput
+            style={styles.input}
+            value={draft.address}
+            onChangeText={(v) => onChangeDraft({ address: v })}
+            placeholder="Ví dụ: 172 An Bình"
+            returnKeyType="next"
+          />
+        </Field>
+      </Section>
+
+      {/* SECTION: Nhà */}
+      <Section title="Nhà">
         <SelectField
-          label="Loại nhà"
+          label="Loại BĐS"
           value={draft.property_type_code}
           items={lookups.property_types}
-          onChange={(value) => onChangeDraft({ property_type_code: value })}
+          onChange={(v) => onChangeDraft({ property_type_code: v })}
           allowEmpty={false}
           emptyLabel="Chọn loại nhà"
         />
         <SelectField
-          label="Trạng thái"
-          value={draft.status_code}
-          items={lookups.statuses}
-          onChange={(value) => onChangeDraft({ status_code: value })}
-          allowEmpty={false}
-          emptyLabel="Chọn trạng thái"
-        />
-      </Section>
-
-      <Section title="Giá và diện tích">
-        <Field label="Giá (tỷ)">
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={draft.price ? String(draft.price) : ""}
-            onChangeText={(value) => onChangeDraft({ price: parseNumberInput(value) })}
-            placeholder="Ví dụ: 18.5"
-          />
-        </Field>
-        <Field label="Diện tích (m²)">
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={draft.area ? String(draft.area) : ""}
-            onChangeText={(value) => onChangeDraft({ area: parseNumberInput(value) })}
-            placeholder="Ví dụ: 72"
-          />
-        </Field>
-        <Field label="Ngang (m)">
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={draft.width ? String(draft.width) : ""}
-            onChangeText={(value) => onChangeDraft({ width: parseNumberInput(value) })}
-            placeholder="Ví dụ: 4.2"
-          />
-        </Field>
-        <Field label="Dài (m)">
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={draft.length ? String(draft.length) : ""}
-            onChangeText={(value) => onChangeDraft({ length: parseNumberInput(value) })}
-            placeholder="Ví dụ: 13.1"
-          />
-        </Field>
-      </Section>
-
-      <Section title="Liên hệ">
-        <Field label="Tên chủ nhà">
-          <TextInput
-            style={styles.input}
-            value={draft.owner_name}
-            onChangeText={(value) => onChangeDraft({ owner_name: value })}
-            placeholder="Nhập tên chủ nhà"
-          />
-        </Field>
-        <Field label="Số điện thoại">
-          <TextInput
-            style={styles.input}
-            keyboardType="phone-pad"
-            value={draft.contact_phone}
-            onChangeText={(value) => onChangeDraft({ contact_phone: value })}
-            placeholder="0909..."
-          />
-        </Field>
-        <SelectField
-          label="Nguồn tin"
-          value={draft.source_code}
-          items={lookups.sources}
-          onChange={(value) => onChangeDraft({ source_code: value })}
-          allowEmpty={false}
-          emptyLabel="Chọn nguồn tin"
-        />
-      </Section>
-
-      <Section title="Bổ sung">
-        <Field label="Số tầng">
-          <TextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            value={draft.floors ? String(draft.floors) : ""}
-            onChangeText={(value) => onChangeDraft({ floors: Math.round(parseNumberInput(value)) })}
-            placeholder="Ví dụ: 4"
-          />
-        </Field>
-        <Field label="Phòng ngủ">
-          <TextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            value={draft.bedrooms ? String(draft.bedrooms) : ""}
-            onChangeText={(value) => onChangeDraft({ bedrooms: Math.round(parseNumberInput(value)) })}
-            placeholder="Ví dụ: 3"
-          />
-        </Field>
-        <Field label="Phòng tắm">
-          <TextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            value={draft.bathrooms ? String(draft.bathrooms) : ""}
-            onChangeText={(value) => onChangeDraft({ bathrooms: Math.round(parseNumberInput(value)) })}
-            placeholder="Ví dụ: 4"
-          />
-        </Field>
-        <SelectField
           label="Pháp lý"
           value={draft.legal_status_code ?? ""}
           items={lookups.legal_statuses}
-          onChange={(value) => onChangeDraft({ legal_status_code: value })}
+          onChange={(v) => onChangeDraft({ legal_status_code: v })}
           emptyLabel="Chưa chọn"
         />
         <SelectField
           label="Hướng"
           value={draft.direction_code ?? ""}
           items={lookups.directions}
-          onChange={(value) => onChangeDraft({ direction_code: value })}
+          onChange={(v) => onChangeDraft({ direction_code: v })}
           emptyLabel="Chưa chọn"
         />
-        <Field label="Mô tả">
+      </Section>
+
+      {/* SECTION: Giá & Kích thước */}
+      <Section title="Giá & Kích thước">
+        <Field label="Giá bán (tỷ)">
+          <TextInput
+            style={styles.input}
+            keyboardType="decimal-pad"
+            value={draft.price ? String(draft.price) : ""}
+            onChangeText={(v) => onChangeDraft({ price: parseNumberInput(v) })}
+            placeholder="Ví dụ: 25"
+            returnKeyType="next"
+          />
+        </Field>
+        <Field label="Diện tích KV (m²)">
+          <TextInput
+            style={styles.input}
+            keyboardType="decimal-pad"
+            value={draft.area ? String(draft.area) : ""}
+            onChangeText={(v) => onChangeDraft({ area: parseNumberInput(v) })}
+            placeholder="Ví dụ: 50"
+            returnKeyType="next"
+          />
+        </Field>
+        <View style={styles.createDimsRow}>
+          <View style={styles.createDimsField}>
+            <Text style={styles.fieldLabel}>Ngang KV (m)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="decimal-pad"
+              value={draft.width ? String(draft.width) : ""}
+              onChangeText={(v) => onChangeDraft({ width: parseNumberInput(v) })}
+              placeholder="5"
+              returnKeyType="next"
+            />
+          </View>
+          <Text style={styles.createDimsSep}>×</Text>
+          <View style={styles.createDimsField}>
+            <Text style={styles.fieldLabel}>Dài KV (m)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="decimal-pad"
+              value={draft.length ? String(draft.length) : ""}
+              onChangeText={(v) => onChangeDraft({ length: parseNumberInput(v) })}
+              placeholder="10"
+              returnKeyType="next"
+            />
+          </View>
+        </View>
+      </Section>
+
+      {/* SECTION: Chủ nhà */}
+      <Section title="Chủ nhà">
+        <Field label="Họ tên chủ (*)">
+          <TextInput
+            style={styles.input}
+            value={draft.owner_name}
+            onChangeText={(v) => onChangeDraft({ owner_name: v })}
+            placeholder="Ví dụ: Chị Liên"
+            returnKeyType="next"
+          />
+        </Field>
+        <Field label="Di động (*)">
+          <TextInput
+            style={styles.input}
+            keyboardType="phone-pad"
+            value={draft.contact_phone}
+            onChangeText={(v) => onChangeDraft({ contact_phone: v })}
+            placeholder="0911.380.022"
+            returnKeyType="next"
+          />
+        </Field>
+      </Section>
+
+      {/* SECTION: Mô tả */}
+      <Section title="Mô tả">
+        <Field label="Tiêu đề (tự tạo nếu bỏ trống)">
+          <TextInput
+            style={styles.input}
+            value={draft.title}
+            onChangeText={(v) => onChangeDraft({ title: v })}
+            placeholder="Ví dụ: Nhà mặt tiền An Bình, Q.5"
+            returnKeyType="next"
+          />
+        </Field>
+        <Field label="Diễn giải">
           <TextInput
             style={[styles.input, styles.textArea]}
             multiline
             value={draft.description ?? ""}
-            onChangeText={(value) => onChangeDraft({ description: value })}
-            placeholder="Mô tả nhanh về căn"
+            onChangeText={(v) => onChangeDraft({ description: v })}
+            placeholder="Nhà đẹp, giá tốt..."
           />
         </Field>
         <Field label="Ghi chú ban đầu">
@@ -330,31 +336,25 @@ export function CreatePropertyScreen({
             style={[styles.input, styles.textArea]}
             multiline
             value={draft.note ?? ""}
-            onChangeText={(value) => onChangeDraft({ note: value })}
-            placeholder="Ghi chú cho căn mới"
+            onChangeText={(v) => onChangeDraft({ note: v })}
+            placeholder="Ghi chú nội bộ khi nhập nhà"
           />
         </Field>
       </Section>
 
-      <View style={styles.draftHint}>
-        <Text style={styles.draftHintText}>
-          {savingDraft ? "Đang lưu draft..." : "Draft form được giữ lại trên máy khi mạng chập chờn."}
-        </Text>
-      </View>
-
+      {/* Submit */}
       <View style={styles.submitPanel}>
-        <Text style={styles.submitPanelTitle}>Sẵn sàng đẩy sang Landsoft</Text>
-        <Text style={styles.submitPanelDescription}>
-          Chỉ gửi khi các thông tin bắt buộc đã đủ. Phần còn lại có thể bổ sung sau trong Landsoft.
-        </Text>
         <Pressable
           style={[styles.primaryButton, submitting && styles.buttonDisabled]}
           disabled={submitting}
           onPress={() => void submit()}
         >
-          <Text style={styles.primaryButtonText}>{submitting ? "Đang gửi..." : "Tạo nhà mới"}</Text>
+          <Feather name="send" size={16} color="#fff" />
+          <Text style={styles.primaryButtonText}>{submitting ? "Đang gửi..." : "Đẩy vào Landsoft"}</Text>
         </Pressable>
+        <Text style={styles.submitPanelDescription}>Draft tự lưu trên máy khi mạng chập chờn</Text>
       </View>
+
     </ScrollView>
   );
 }

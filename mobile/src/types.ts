@@ -34,6 +34,7 @@ export type LookupCollections = {
   legal_statuses: LookupItem[];
   statuses: LookupItem[];
   sources: LookupItem[];
+  grades: LookupItem[];
 };
 
 export type PropertySummary = {
@@ -112,11 +113,9 @@ export type PropertyCreatePayload = {
   area: number;
   width?: number;
   length?: number;
-  floors?: number;
-  bedrooms?: number;
-  bathrooms?: number;
   legal_status_code?: string;
   direction_code?: string;
+  grade_code?: string;
   description?: string;
   note?: string;
   listing_type?: string;

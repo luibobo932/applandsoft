@@ -320,12 +320,16 @@ class SqlLandsoftGateway:
                 "legal_statuses": "SELECT CAST(MaPL AS nvarchar(20)) AS code, TenPL AS label FROM dbo.PhapLy ORDER BY MaPL",
                 "statuses": "SELECT CAST(MaTT AS nvarchar(20)) AS code, TenTT AS label FROM dbo.mglbcTrangThai ORDER BY STT",
                 "sources": "SELECT CAST(MaNguon AS nvarchar(20)) AS code, TenNguon AS label FROM dbo.mglNguon ORDER BY MaNguon",
+                "grades": "SELECT CAST(MaCD AS nvarchar(20)) AS code, TenCD AS label FROM dbo.mglbcCapDo ORDER BY STT, MaCD",
             }
 
             payload: dict[str, list[dict[str, Any]]] = {}
             for key, sql in queries.items():
-                cursor.execute(sql)
-                payload[key] = self._fetch_all_dicts(cursor)
+                try:
+                    cursor.execute(sql)
+                    payload[key] = self._fetch_all_dicts(cursor)
+                except Exception:
+                    payload[key] = []
             return payload
 
     def list_properties(self, filters: dict) -> tuple[list[dict], int]:
@@ -460,7 +464,7 @@ class SqlLandsoftGateway:
                         ?, 0, 0, ?, ?, ?, ?,
                         0, ?, ?, ?, ?, 0, 0, ?, ?,
                         ?, ?, ?, ?, 0, 0, 0, 0, 0,
-                        NULL, GETDATE(), 2, ?, 0, 0, 1, GETDATE(),
+                        NULL, GETDATE(), ?, ?, 0, 0, 1, GETDATE(),
                         N'', ?, NULL, NULL, ?, ?, ?, ?,
                         ?, NULL, N'', 0, 0, 0, NULL, N'%',
                         NULL, NULL, NULL
@@ -492,6 +496,7 @@ class SqlLandsoftGateway:
                     area,
                     float(payload.get("width") or 0),
                     float(payload.get("length") or 0),
+                    int(payload.get("grade_code") or 2),
                     int(payload["source_code"]),
                     payload.get("contact_phone") or "",
                     street_id,

@@ -87,11 +87,9 @@ class PropertyCreateRequest(BaseModel):
     area: float
     width: float | None = None
     length: float | None = None
-    floors: int | None = None
-    bedrooms: int | None = None
-    bathrooms: int | None = None
     legal_status_code: str | None = None
     direction_code: str | None = None
+    grade_code: str | None = None
     description: str | None = None
     note: str | None = None
     listing_type: str = "ban"

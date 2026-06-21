@@ -65,11 +65,9 @@ const emptyDraft: PropertyCreatePayload = {
   area: 0,
   width: 0,
   length: 0,
-  floors: 0,
-  bedrooms: 0,
-  bathrooms: 0,
   legal_status_code: "",
   direction_code: "",
+  grade_code: "",
   description: "",
   note: "",
   listing_type: "ban",
@@ -83,6 +81,7 @@ const emptyLookups: LookupCollections = {
   legal_statuses: [],
   statuses: [],
   sources: [],
+  grades: [],
 };
 
 const emptyFilters: PropertyFilters = {
