@@ -50,6 +50,10 @@ export type PropertySummary = {
   status_code?: string | null;
   status_name?: string | null;
   description?: string | null;
+  owner_name?: string | null;
+  contact_phone?: string | null;
+  width?: number | null;
+  length?: number | null;
 };
 
 export type PropertyNote = {

@@ -17,6 +17,10 @@ class PropertySummary(BaseModel):
     status_code: str | None = None
     status_name: str | None = None
     description: str | None = None
+    owner_name: str | None = None
+    contact_phone: str | None = None
+    width: float | None = None
+    length: float | None = None
 
 
 class PropertyNote(BaseModel):

@@ -24,6 +24,7 @@ import {
   pickLabel,
   splitAddress,
   getStatusTone,
+  getInitials,
 } from "../utils";
 import { LookupCollections, PropertyFilters, PropertySummary } from "../types";
 
@@ -310,9 +311,16 @@ export function PropertyListScreen({
             .filter(Boolean)
             .join(" • ");
           const addressParts = splitAddress(item.address);
+          const ownerName = cleanDisplayText(item.owner_name, "");
+          const phone = cleanDisplayText(item.contact_phone, "");
+          const dims = [
+            item.width && item.width > 0 ? `${item.width}m` : null,
+            item.length && item.length > 0 ? `${item.length}m` : null,
+          ].filter(Boolean).join(" × ");
           return (
             <View style={styles.propertyRow}>
               <Pressable style={styles.propertyCardTapArea} onPress={() => onOpenProperty(item.landsoft_id)}>
+                {/* Hero strip */}
                 <View style={styles.propertyHero}>
                   <View style={styles.propertyHeroTop}>
                     <View
@@ -333,25 +341,43 @@ export function PropertyListScreen({
                       <View style={styles.propertyCodePill}>
                         <Text style={styles.propertyCode}>{item.code}</Text>
                       </View>
-                      <View style={styles.propertyFavoriteBubble}>
-                        <Feather name="heart" size={18} color="#8B9AB0" />
-                      </View>
                     </View>
                   </View>
-                  <View style={styles.propertyHeroBody}>
-                    <View style={styles.propertyHeroIconWrap}>
-                      <Feather name="home" size={34} color="#96A6C0" />
+                  {/* Owner + phone row in hero */}
+                  <View style={styles.propertyHeroContact}>
+                    <View style={styles.propertyHeroContactBadge}>
+                      <Text style={styles.propertyHeroContactInitials}>{getInitials(ownerName || "?", "?")}</Text>
                     </View>
-                    <Text style={styles.propertyHeroLabel}>Chưa có ảnh</Text>
+                    <View style={styles.propertyHeroContactInfo}>
+                      <Text style={styles.propertyHeroContactName} numberOfLines={1}>
+                        {ownerName || "Chưa có chủ nhà"}
+                      </Text>
+                      {phone ? (
+                        <Text style={styles.propertyHeroContactPhone}>{phone}</Text>
+                      ) : (
+                        <Text style={styles.propertyHeroContactPhoneMissing}>Chưa có SĐT</Text>
+                      )}
+                    </View>
+                    {phone ? (
+                      <Pressable
+                        style={styles.propertyHeroPhoneButton}
+                        onPress={() => void onQuickViewPhone(item.landsoft_id)}
+                      >
+                        <Feather name="phone" size={16} color="#F37021" />
+                      </Pressable>
+                    ) : null}
                   </View>
                 </View>
 
+                {/* Body */}
                 <View style={styles.propertyBody}>
                   <View style={styles.propertyPriceRow}>
                     <Text style={styles.propertyPrice}>{formatMoney(item.price)}</Text>
-                    <View style={styles.propertyUpdatedChip}>
-                      <Text style={styles.propertyUpdatedChipText}>Mới cập nhật</Text>
-                    </View>
+                    {dims ? (
+                      <View style={styles.propertyUpdatedChip}>
+                        <Text style={styles.propertyUpdatedChipText}>{dims}</Text>
+                      </View>
+                    ) : null}
                   </View>
                   <Text style={styles.propertyTitle} numberOfLines={2}>
                     {cleanDisplayText(item.title, "Chưa có tiêu đề")}
@@ -372,6 +398,12 @@ export function PropertyListScreen({
                       <Feather name="maximize" size={14} color="#8B9AB0" />
                       <Text style={styles.propertyFactText}>{formatArea(item.area)}</Text>
                     </View>
+                    {dims ? (
+                      <View style={styles.propertyFact}>
+                        <Feather name="move" size={14} color="#8B9AB0" />
+                        <Text style={styles.propertyFactText}>{dims}</Text>
+                      </View>
+                    ) : null}
                     {item.district_name ? (
                       <View style={styles.propertyFact}>
                         <Feather name="map-pin" size={14} color="#8B9AB0" />
@@ -385,11 +417,13 @@ export function PropertyListScreen({
                       </View>
                     ) : null}
                   </View>
-                  <Text style={styles.propertySnippet} numberOfLines={3}>
+                  <Text style={styles.propertySnippet} numberOfLines={2}>
                     {cleanDisplayText(item.description, "Không có mô tả")}
                   </Text>
                 </View>
               </Pressable>
+
+              {/* Action bar */}
               <View style={styles.propertyActionBar}>
                 <View style={styles.propertyActionRow}>
                   <Pressable style={styles.propertyPrimaryAction} onPress={() => onOpenProperty(item.landsoft_id)}>

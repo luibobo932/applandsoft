@@ -42,7 +42,11 @@ class SqlLandsoftGateway:
             CAST(COALESCE(NULLIF(bc.DienTich, 0), NULLIF(bc.DienTichKV, 0), NULLIF(bc.DienTichXD, 0)) AS float) AS area,
             CAST(bc.MaTT AS nvarchar(20)) AS status_code,
             tt.TenTT AS status_name,
-            COALESCE(NULLIF(CAST(bc.NoiDung AS nvarchar(max)), N''), NULLIF(bc.DienGiai, N''), NULLIF(bc.TieuDe, N''), N'') AS description
+            COALESCE(NULLIF(CAST(bc.NoiDung AS nvarchar(max)), N''), NULLIF(bc.DienGiai, N''), NULLIF(bc.TieuDe, N''), N'') AS description,
+            LTRIM(RTRIM(COALESCE(kh.HoKH, N'') + CASE WHEN ISNULL(kh.HoKH, N'') <> N'' AND ISNULL(kh.TenKH, N'') <> N'' THEN N' ' ELSE N'' END + COALESCE(kh.TenKH, N''))) AS owner_name,
+            COALESCE(NULLIF(kh.DiDong, N''), NULLIF(bc.DienThoaiNDD, N''), N'') AS contact_phone,
+            CAST(COALESCE(NULLIF(bc.NgangKV, 0), 0) AS float) AS width,
+            CAST(COALESCE(NULLIF(bc.DaiKV, 0), 0) AS float) AS length
     """
 
     DETAIL_SQL = """
