@@ -1,14 +1,14 @@
 # Landsoft Mobile App
 
-## Màn hình v1
+## Man hinh v1
 
-- Đăng nhập
-- Kho hàng
-- Chi tiết căn
-- Nhập nhà mới
-- Lịch sử thao tác gần đây
+- Dang nhap
+- Kho hang
+- Chi tiet can
+- Nhap nha moi
+- Lich su thao tac gan day
 
-## Chạy local
+## Chay local
 
 ```powershell
 cd D:\12. Tools\anthitphanmem\landsoft-mobile\mobile
@@ -17,10 +17,11 @@ npm install
 npx expo start --tunnel
 ```
 
-## Build APK sau khi chốt backend cloud
+## Build APK tro thang toi backend server
 
 ```powershell
-npx eas build --platform android --profile preview
+cd D:\12. Tools\anthitphanmem\landsoft-mobile
+powershell -NoProfile -ExecutionPolicy Bypass -File .\runtime\build_server_apk.ps1 -ServerApiBaseUrl "https://backend-cua-ban/api/v1"
 ```
 
-Muốn build APK thật cần sửa `EXPO_PUBLIC_API_BASE_URL` sang domain HTTPS của backend.
+Script nay dong thang `EXPO_PUBLIC_API_BASE_URL` vao APK release. Khong nen de fallback tro ve IP laptop.

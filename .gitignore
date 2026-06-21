@@ -14,6 +14,7 @@ backend/config/local_app_users.json
 backend/data/audit.log
 backend/data/*.log
 backend/data/discovery/
+backend/data/server_bootstrap/
 
 # Mobile local data
 mobile/node_modules/

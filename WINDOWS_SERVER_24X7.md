@@ -16,6 +16,33 @@ Loi ich:
 - Khong phai cung WiFi
 - Khong mo cong SQL Server ra internet cong khai
 
+## 0. Xuat bundle cau hinh tu laptop hien tai
+
+Tren laptop dang chay Landsoft, xuat bundle rieng de mang len server:
+
+```powershell
+cd D:\12. Tools\anthitphanmem\landsoft-mobile\backend
+python .\scripts\export_server_bootstrap.py --server-api-base-url "http://100.x.x.x:8000/api/v1"
+```
+
+Bundle se nam o:
+
+```text
+backend\data\server_bootstrap\
+```
+
+Trong do:
+
+- `backend.env.private`: doi ten thanh `backend\.env` tren server
+- `landsoft_context.json`: xac nhan config/server/user da doc tu laptop
+- `README.txt`: huong dan thao tac nhanh
+
+Luu y:
+
+- RSA key de giai ma password user Landsoft da nam san trong `backend/app/core/landsoft_crypto.py`
+- Nghia la khong can copy them "key dang nhap Landsoft" tu laptop sang server
+- Thu can chuyen sang server la cau hinh backend va SQL credentials
+
 ## 1. Chuan bi tren server
 
 Copy thu muc project len server, it nhat can:

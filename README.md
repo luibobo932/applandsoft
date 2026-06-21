@@ -49,3 +49,7 @@ Tai lieu dua backend len Windows Server 24/7:
 Script build APK tro toi backend tren server:
 
 - `runtime/build_server_apk.ps1`
+
+Script xuat bootstrap tu laptop hien tai sang server:
+
+- `backend/scripts/export_server_bootstrap.py`
