@@ -98,12 +98,14 @@ const emptyFilters: PropertyFilters = {
 };
 
 function getPreferredApiBaseUrl(storedApiBaseUrl?: string | null): string {
-  if (storedApiBaseUrl?.trim()) {
-    return setApiBaseUrl(storedApiBaseUrl);
-  }
+  // Tren emulator (may dev): cho phep URL da luu de tien test, mac dinh 10.0.2.2
   if (isAndroidEmulatorRuntime()) {
+    if (storedApiBaseUrl?.trim()) {
+      return setApiBaseUrl(storedApiBaseUrl);
+    }
     return setApiBaseUrl(EMULATOR_API_BASE_URL);
   }
+  // Tren dien thoai that: luon dung URL Tailscale gan san, bo qua gia tri cu da luu
   return setApiBaseUrl(defaultApiBaseUrl);
 }
 

@@ -1,4 +1,4 @@
-const fallbackApiBaseUrl = "https://simulations-computation-lung-real.trycloudflare.com/api/v1";
+const fallbackApiBaseUrl = "http://100.93.221.38:8000/api/v1";
 const rawBaseUrl = "";
 
 export function normalizeApiBaseUrl(value?: string | null): string {

@@ -104,13 +104,9 @@ export function isAndroidEmulatorRuntime(): boolean {
   const fingerprint = String(constants.Fingerprint ?? "").toLowerCase();
 
   return (
-    brand.includes("generic") ||
     manufacturer.includes("genymotion") ||
-    model.includes("sdk") ||
-    model.includes("emulator") ||
     model.includes("android sdk built for") ||
-    fingerprint.includes("generic") ||
-    fingerprint.includes("emulator")
+    (brand === "generic" && fingerprint.includes("generic/sdk"))
   );
 }
 
