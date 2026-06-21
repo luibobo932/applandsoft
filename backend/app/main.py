@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -5,6 +7,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from app.core.config import get_settings
 from app.db.sqlserver import check_sql_connection
 from app.routers import activity, auth, lookups, me, properties
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -49,6 +53,7 @@ def create_app() -> FastAPI:
         try:
             check_sql_connection()
         except Exception:
+            logger.exception("Readiness check khong ket noi duoc SQL Server Landsoft")
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 content={"ok": False, "reason": "sql_unavailable"},
