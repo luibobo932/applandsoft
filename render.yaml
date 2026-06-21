@@ -3,7 +3,7 @@ services:
     name: landsoft-mobile-api
     runtime: docker
     rootDir: backend
-    plan: starter
+    plan: free
     autoDeploy: true
     healthCheckPath: /ready
     envVars:
