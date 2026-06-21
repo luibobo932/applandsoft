@@ -148,7 +148,7 @@ export function CreatePropertyScreen({
             </Text>
           </Pressable>
         </View>
-        {lookups.grades.length > 0 ? (
+        {(lookups.grades?.length ?? 0) > 0 ? (
           <SelectField
             label="Cấp độ"
             value={draft.grade_code ?? ""}

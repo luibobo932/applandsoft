@@ -220,8 +220,8 @@ export default function App() {
 
   const loadLookups = useCallback(async (token: string) => {
     const data = await fetchLookups(token);
-    setLookups(data);
-    // BUG FIX: don't auto-set draft defaults from first item — let user pick explicitly
+    // Merge with emptyLookups so any missing key keeps its default []
+    setLookups({ ...emptyLookups, ...data });
   }, []);
 
   const loadProperties = useCallback(
