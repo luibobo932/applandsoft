@@ -153,7 +153,7 @@ export function PropertyDetailScreen({
   }
 
   const statusTone = getStatusTone(property.status_name);
-  const locationLine = [cleanDisplayText(property.district_name, ""), cleanDisplayText(property.ward_name, "")]
+  const locationLine = [cleanDisplayText(property.ward_name, ""), cleanDisplayText(property.district_name, "")]
     .filter(Boolean)
     .join(" • ");
   const detailAddressParts = splitAddress(property.address);

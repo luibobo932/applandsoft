@@ -21,50 +21,82 @@ export function RangeSlider({
   onChange: (low: number, high: number) => void;
 }) {
   const [width, setWidth] = useState(0);
+
+  // Tat ca du lieu cho PanResponder doc qua ref de tranh capture closure cu (luc width=0)
+  const widthRef = useRef(0);
+  const cfgRef = useRef({ min, max, step });
   const lowRef = useRef(low);
   const highRef = useRef(high);
-  const startXRef = useRef(0);
+  const onChangeRef = useRef(onChange);
+  const activeRef = useRef<"low" | "high">("low");
+  const trackLeftRef = useRef(0);
+  cfgRef.current = { min, max, step };
   lowRef.current = low;
   highRef.current = high;
+  onChangeRef.current = onChange;
 
-  const trackW = Math.max(width - THUMB, 1);
-  const span = Math.max(max - min, 1);
+  const trackWidth = () => Math.max(widthRef.current - THUMB, 1);
 
-  const valueToX = (value: number) => ((value - min) / span) * trackW;
   const xToValue = (x: number) => {
-    const raw = min + (x / trackW) * span;
-    const stepped = Math.round(raw / step) * step;
-    return Math.min(max, Math.max(min, stepped));
+    const { min: lo, max: hi, step: st } = cfgRef.current;
+    const tw = trackWidth();
+    const span = Math.max(hi - lo, 1);
+    const clampedX = Math.min(Math.max(x, 0), tw);
+    const raw = lo + (clampedX / tw) * span;
+    const stepped = Math.round(raw / st) * st;
+    return Math.min(hi, Math.max(lo, stepped));
   };
 
-  const makeResponder = (which: "low" | "high") =>
+  // Keo thumb dang active; vuot qua thumb kia thi doi vai -> luon tach ra duoc
+  const apply = (value: number) => {
+    if (activeRef.current === "low") {
+      if (value <= highRef.current) {
+        onChangeRef.current(value, highRef.current);
+      } else {
+        activeRef.current = "high";
+        onChangeRef.current(highRef.current, value);
+      }
+    } else if (value >= lowRef.current) {
+      onChangeRef.current(lowRef.current, value);
+    } else {
+      activeRef.current = "low";
+      onChangeRef.current(value, lowRef.current);
+    }
+  };
+
+  const responder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        startXRef.current = valueToX(which === "low" ? lowRef.current : highRef.current);
+      onPanResponderGrant: (event) => {
+        const { locationX, pageX } = event.nativeEvent;
+        trackLeftRef.current = pageX - locationX;
+        const value = xToValue(locationX - THUMB / 2);
+        activeRef.current =
+          Math.abs(value - lowRef.current) <= Math.abs(value - highRef.current) ? "low" : "high";
+        apply(value);
       },
-      onPanResponderMove: (_event, gesture) => {
-        const value = xToValue(startXRef.current + gesture.dx);
-        if (which === "low") {
-          onChange(Math.min(value, highRef.current), highRef.current);
-        } else {
-          onChange(lowRef.current, Math.max(value, lowRef.current));
-        }
+      onPanResponderMove: (event) => {
+        const x = event.nativeEvent.pageX - trackLeftRef.current - THUMB / 2;
+        apply(xToValue(x));
       },
-    });
+    })
+  ).current;
 
-  const lowResponder = useRef(makeResponder("low")).current;
-  const highResponder = useRef(makeResponder("high")).current;
-
-  const lowX = valueToX(low);
-  const highX = valueToX(high);
+  const span = Math.max(max - min, 1);
+  const trackW = Math.max(width - THUMB, 1);
+  const lowX = ((low - min) / span) * trackW;
+  const highX = ((high - min) / span) * trackW;
 
   return (
     <View
       style={styles.rangeSliderTrackWrap}
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      onLayout={(event) => {
+        widthRef.current = event.nativeEvent.layout.width;
+        setWidth(event.nativeEvent.layout.width);
+      }}
+      {...responder.panHandlers}
     >
       <View style={styles.rangeSliderTrack} />
       <View
@@ -73,14 +105,8 @@ export function RangeSlider({
           { left: lowX + THUMB / 2, width: Math.max(highX - lowX, 0) },
         ]}
       />
-      <View
-        {...lowResponder.panHandlers}
-        style={[styles.rangeSliderThumb, { left: lowX }]}
-      />
-      <View
-        {...highResponder.panHandlers}
-        style={[styles.rangeSliderThumb, { left: highX }]}
-      />
+      <View pointerEvents="none" style={[styles.rangeSliderThumb, { left: lowX }]} />
+      <View pointerEvents="none" style={[styles.rangeSliderThumb, { left: highX }]} />
     </View>
   );
 }

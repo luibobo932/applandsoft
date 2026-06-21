@@ -176,10 +176,18 @@ class SqlLandsoftGateway:
             clauses.append("AND bc.MaTT = ?")
             params.append(int(status))
 
-        property_type = (filters.get("property_type") or "").strip()
-        if property_type:
-            clauses.append("AND bc.MaLBDS = ?")
-            params.append(int(property_type))
+        # Loai nha: ho tro nhieu ma (vd nhom Nha hem = 2,12,13,14) qua 'property_types' CSV
+        property_types_raw = (filters.get("property_types") or "").strip()
+        type_codes: list[int] = []
+        if property_types_raw:
+            type_codes = [int(code) for code in property_types_raw.split(",") if code.strip().isdigit()]
+        single_type = (filters.get("property_type") or "").strip()
+        if not type_codes and single_type.isdigit():
+            type_codes = [int(single_type)]
+        if type_codes:
+            placeholders = ",".join("?" for _ in type_codes)
+            clauses.append(f"AND bc.MaLBDS IN ({placeholders})")
+            params.extend(type_codes)
 
         if filters.get("price_min") is not None:
             clauses.append("AND bc.ThanhTien >= ?")

@@ -47,6 +47,17 @@ const AREA_CHIPS: QuickRange[] = [
   { label: "200+ m²", min: 200 },
 ];
 
+// Loai nha 2 cap nhu app SKL: Mat tien / Hem (hem -> xe hoi, 3 gac, xe may)
+const MAT_TIEN_TYPE = "1";
+const HEM_ALL_TYPES = "2,12,13,14"; // Nha hem + Hem xe tai + xe hoi + ba gac
+const HEM_SUBS: { value: string; label: string }[] = [
+  { value: "13", label: "Hẻm xe hơi" },
+  { value: "14", label: "Hẻm 3 gác" },
+  { value: "2", label: "Hẻm xe máy" },
+];
+const isHemTypes = (value?: string) =>
+  value === HEM_ALL_TYPES || HEM_SUBS.some((sub) => sub.value === value);
+
 const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: "newest", label: "Mới nhất" },
   { value: "price_desc", label: "Giá cao → thấp" },
@@ -99,6 +110,7 @@ export function PropertyListScreen({
       street: "",
       status: "",
       property_type: "",
+      property_types: "",
       price_min: undefined,
       price_max: undefined,
       area_min: undefined,
@@ -132,9 +144,15 @@ export function PropertyListScreen({
     selectedDistricts.length > 0
       ? selectedDistricts.map((code) => pickLabel(lookups.districts, code)).join(", ")
       : "";
+  const propertyTypeChipLabel = !filters.property_types
+    ? ""
+    : filters.property_types === MAT_TIEN_TYPE
+    ? "Nhà mặt tiền"
+    : HEM_SUBS.find((sub) => sub.value === filters.property_types)?.label ??
+      (filters.property_types === HEM_ALL_TYPES ? "Nhà hẻm" : "Loại nhà");
   const activeFilterChips = [
     filters.keyword?.trim() ? "Từ khóa: " + filters.keyword.trim() : "",
-    filters.property_type ? pickLabel(lookups.property_types, filters.property_type) : "",
+    propertyTypeChipLabel,
     districtChipLabel,
     filters.ward ? pickLabel(lookups.wards, filters.ward) : "",
     filters.street?.trim() ? "Đường: " + filters.street.trim() : "",
@@ -322,28 +340,48 @@ export function PropertyListScreen({
                 <Text style={styles.filterGroupLabel}>Loại nhà</Text>
                 <View style={styles.typeToggleRow}>
                   <Pressable
-                    style={[styles.typeToggleButton, !filters.property_type && styles.typeToggleButtonActive]}
-                    onPress={() => onChangeFilter({ property_type: "" })}
+                    style={[styles.typeToggleButton, !filters.property_types && styles.typeToggleButtonActive]}
+                    onPress={() => onChangeFilter({ property_types: "", property_type: "" })}
                   >
-                    <Text style={[styles.typeToggleText, !filters.property_type && styles.typeToggleTextActive]}>
+                    <Text style={[styles.typeToggleText, !filters.property_types && styles.typeToggleTextActive]}>
                       Tất cả
                     </Text>
                   </Pressable>
-                  {lookups.property_types.map((type) => {
-                    const active = filters.property_type === type.code;
-                    return (
-                      <Pressable
-                        key={type.code}
-                        style={[styles.typeToggleButton, active && styles.typeToggleButtonActive]}
-                        onPress={() => onChangeFilter({ property_type: active ? "" : type.code })}
-                      >
-                        <Text style={[styles.typeToggleText, active && styles.typeToggleTextActive]}>
-                          {type.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                  <Pressable
+                    style={[styles.typeToggleButton, filters.property_types === MAT_TIEN_TYPE && styles.typeToggleButtonActive]}
+                    onPress={() => onChangeFilter({ property_types: MAT_TIEN_TYPE, property_type: "" })}
+                  >
+                    <Text style={[styles.typeToggleText, filters.property_types === MAT_TIEN_TYPE && styles.typeToggleTextActive]}>
+                      Nhà mặt tiền
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.typeToggleButton, isHemTypes(filters.property_types) && styles.typeToggleButtonActive]}
+                    onPress={() => onChangeFilter({ property_types: HEM_ALL_TYPES, property_type: "" })}
+                  >
+                    <Text style={[styles.typeToggleText, isHemTypes(filters.property_types) && styles.typeToggleTextActive]}>
+                      Nhà hẻm
+                    </Text>
+                  </Pressable>
                 </View>
+                {isHemTypes(filters.property_types) ? (
+                  <View style={styles.quickChipRow}>
+                    {HEM_SUBS.map((sub) => {
+                      const active = filters.property_types === sub.value;
+                      return (
+                        <Pressable
+                          key={sub.value}
+                          style={[styles.quickChip, active && styles.quickChipActive]}
+                          onPress={() =>
+                            onChangeFilter({ property_types: active ? HEM_ALL_TYPES : sub.value, property_type: "" })
+                          }
+                        >
+                          <Text style={[styles.quickChipText, active && styles.quickChipTextActive]}>{sub.label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
 
                 <Text style={styles.filterGroupLabel}>Trạng thái</Text>
                 <SelectField
@@ -556,7 +594,7 @@ export function PropertyListScreen({
           const address = cleanDisplayText(item.address, "");
           const district = cleanDisplayText(item.district_name, "");
           const ward = cleanDisplayText(item.ward_name, "");
-          const location = [district, ward].filter(Boolean).join(" · ");
+          const location = [ward, district].filter(Boolean).join(" · ");
           const locationLine = [address, location].filter(Boolean).join(", ")
             || cleanDisplayText(item.title, item.code);
           return (
