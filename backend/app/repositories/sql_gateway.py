@@ -144,10 +144,27 @@ class SqlLandsoftGateway:
             )
             params.extend([like] * 9)
 
-        district = (filters.get("district") or "").strip()
-        if district:
-            clauses.append("AND bc.MaHuyen = ?")
-            params.append(int(district))
+        # Quan: ho tro chon nhieu (uu tien nhieu khu vuc) qua 'districts' (CSV), van giu 'district' don le
+        districts_raw = (filters.get("districts") or "").strip()
+        district_codes: list[int] = []
+        if districts_raw:
+            district_codes = [int(code) for code in districts_raw.split(",") if code.strip().isdigit()]
+        single_district = (filters.get("district") or "").strip()
+        if not district_codes and single_district.isdigit():
+            district_codes = [int(single_district)]
+        if district_codes:
+            placeholders = ",".join("?" for _ in district_codes)
+            clauses.append(f"AND bc.MaHuyen IN ({placeholders})")
+            params.extend(district_codes)
+
+        street = (filters.get("street") or "").strip()
+        if street:
+            clauses.append("AND s.Names LIKE ?")
+            params.append(f"%{street}%")
+
+        if filters.get("width_min") is not None:
+            clauses.append("AND bc.NgangKV >= ?")
+            params.append(float(filters["width_min"]))
 
         ward = (filters.get("ward") or "").strip()
         if ward:
@@ -340,11 +357,22 @@ class SqlLandsoftGateway:
                     payload[key] = []
             return payload
 
+    # Sap xep: whitelist cung de tranh SQL injection (khong noi chuoi nguoi dung vao ORDER BY)
+    _AREA_EXPR = "COALESCE(NULLIF(bc.DienTich, 0), NULLIF(bc.DienTichKV, 0), NULLIF(bc.DienTichXD, 0))"
+    SORT_OPTIONS = {
+        "newest": "bc.NgayCN DESC, bc.MaBC DESC",
+        "price_desc": "bc.ThanhTien DESC, bc.MaBC DESC",
+        "price_asc": "bc.ThanhTien ASC, bc.MaBC DESC",
+        "area_desc": f"{_AREA_EXPR} DESC, bc.MaBC DESC",
+        "area_asc": f"{_AREA_EXPR} ASC, bc.MaBC DESC",
+    }
+
     def list_properties(self, filters: dict) -> tuple[list[dict], int]:
         page = max(int(filters.get("page", 1)), 1)
         page_size = max(min(int(filters.get("page_size", 20)), 5000), 1)
         offset = (page - 1) * page_size
         extra_where, where_params = self._build_where_clause(filters)
+        order_by = self.SORT_OPTIONS.get((filters.get("sort") or "newest"), self.SORT_OPTIONS["newest"])
 
         with open_sql_connection() as conn:
             cursor = conn.cursor()
@@ -354,7 +382,7 @@ class SqlLandsoftGateway:
 
             list_sql = (
                 f"{self.LIST_SELECT_SQL} {self.LIST_BASE_SQL} {extra_where} "
-                "ORDER BY bc.NgayCN DESC, bc.MaBC DESC "
+                f"ORDER BY {order_by} "
                 "OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"
             )
             cursor.execute(list_sql, [*where_params, offset, page_size])

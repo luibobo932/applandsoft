@@ -47,6 +47,19 @@ const AREA_CHIPS: QuickRange[] = [
   { label: "200+ m²", min: 200 },
 ];
 
+const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: "newest", label: "Mới nhất" },
+  { value: "price_desc", label: "Giá cao → thấp" },
+  { value: "price_asc", label: "Giá thấp → cao" },
+  { value: "area_desc", label: "Diện tích lớn → nhỏ" },
+  { value: "area_asc", label: "Diện tích nhỏ → lớn" },
+];
+
+// Tach danh sach quan da chon tu chuoi CSV
+function parseDistrictCsv(value?: string): string[] {
+  return (value ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+
 export function PropertyListScreen({
   filters,
   items,
@@ -81,28 +94,54 @@ export function PropertyListScreen({
     onChangeFilter({
       keyword: "",
       district: "",
+      districts: "",
       ward: "",
+      street: "",
       status: "",
       property_type: "",
       price_min: undefined,
       price_max: undefined,
       area_min: undefined,
       area_max: undefined,
+      width_min: undefined,
+      sort: "newest",
       page: 1,
     });
   }, [onChangeFilter]);
-  const wardOptions = useMemo(
-    () => lookups.wards.filter((item) => !filters.district || item.parent_code === filters.district),
-    [filters.district, lookups.wards]
+  const selectedDistricts = parseDistrictCsv(filters.districts);
+  const toggleDistrict = useCallback(
+    (code: string) => {
+      const current = parseDistrictCsv(filters.districts);
+      const next = current.includes(code)
+        ? current.filter((item) => item !== code)
+        : [...current, code];
+      onChangeFilter({ districts: next.join(","), district: "", ward: "" });
+    },
+    [filters.districts, onChangeFilter]
   );
+  const wardOptions = useMemo(
+    () =>
+      lookups.wards.filter(
+        (item) =>
+          selectedDistricts.length === 0 ||
+          (item.parent_code != null && selectedDistricts.includes(item.parent_code))
+      ),
+    [selectedDistricts, lookups.wards]
+  );
+  const districtChipLabel =
+    selectedDistricts.length > 0
+      ? selectedDistricts.map((code) => pickLabel(lookups.districts, code)).join(", ")
+      : "";
   const activeFilterChips = [
     filters.keyword?.trim() ? "Từ khóa: " + filters.keyword.trim() : "",
     filters.property_type ? pickLabel(lookups.property_types, filters.property_type) : "",
-    filters.district ? pickLabel(lookups.districts, filters.district) : "",
+    districtChipLabel,
     filters.ward ? pickLabel(lookups.wards, filters.ward) : "",
+    filters.street?.trim() ? "Đường: " + filters.street.trim() : "",
     filters.status ? pickLabel(lookups.statuses, filters.status) : "",
     buildRangeLabel("Giá", filters.price_min, filters.price_max, " tỷ"),
     buildRangeLabel("DT", filters.area_min, filters.area_max, " m²"),
+    filters.width_min != null ? `Ngang ≥ ${filters.width_min}m` : "",
   ].filter(Boolean);
   const activeFilterCount = activeFilterChips.length;
   const summaryLabel =
@@ -111,6 +150,15 @@ export function PropertyListScreen({
     activeFilterCount > 0
       ? activeFilterChips.join(" • ")
       : `Tổng kho ${formatCount(totalCount)} căn trong Landsoft. Tìm nhanh theo tên, mô tả, địa chỉ hoặc mở bộ lọc nâng cao.`;
+
+  // "Đang bán" = Mở bán, "Đã bán" = Đã giao dịch — tìm theo nhãn trạng thái của Landsoft
+  const findStatusCode = (...keywords: string[]) =>
+    lookups.statuses.find((item) =>
+      keywords.every((kw) => (item.label ?? "").toLowerCase().includes(kw))
+    )?.code ?? "";
+  const sellingStatusCode = findStatusCode("mở", "bán");
+  const soldStatusCode = findStatusCode("đã", "giao") || findStatusCode("đã", "bán");
+  const currentSort = filters.sort ?? "newest";
 
   return (
     <View style={styles.screen}>
@@ -229,21 +277,47 @@ export function PropertyListScreen({
                   ) : null}
                 </View>
 
-                <Text style={styles.filterGroupLabel}>Khu vực</Text>
+                <Text style={styles.filterGroupLabel}>Khu vực — Quận/Huyện ưu tiên</Text>
+                {selectedDistricts.length > 0 ? (
+                  <View style={styles.quickChipRow}>
+                    {selectedDistricts.map((code) => (
+                      <Pressable
+                        key={code}
+                        style={[styles.quickChip, styles.quickChipActive]}
+                        onPress={() => toggleDistrict(code)}
+                      >
+                        <Text style={styles.quickChipTextActive}>{pickLabel(lookups.districts, code)}  ✕</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
                 <SelectField
-                  label="Quận / Huyện"
-                  value={filters.district ?? ""}
-                  items={lookups.districts}
-                  onChange={(value) => onChangeFilter({ district: value, ward: "" })}
-                  emptyLabel="Tất cả quận"
+                  label="Thêm quận/huyện"
+                  value=""
+                  items={lookups.districts.filter((d) => !selectedDistricts.includes(d.code))}
+                  onChange={(value) => {
+                    if (value) toggleDistrict(value);
+                  }}
+                  emptyLabel="Chọn để thêm (có thể chọn nhiều)"
                 />
-                <SelectField
-                  label="Phường / Xã"
-                  value={filters.ward ?? ""}
-                  items={wardOptions}
-                  onChange={(value) => onChangeFilter({ ward: value })}
-                  emptyLabel="Tất cả phường"
-                />
+                {wardOptions.length > 0 ? (
+                  <SelectField
+                    label="Phường / Xã"
+                    value={filters.ward ?? ""}
+                    items={wardOptions}
+                    onChange={(value) => onChangeFilter({ ward: value })}
+                    emptyLabel="Tất cả phường"
+                  />
+                ) : null}
+                <Field label="Đường (tên đường)">
+                  <TextInput
+                    style={styles.input}
+                    value={filters.street ?? ""}
+                    onChangeText={(value) => onChangeFilter({ street: value })}
+                    placeholder="VD: Nguyễn Trãi"
+                    returnKeyType="search"
+                  />
+                </Field>
 
                 <Text style={styles.filterGroupLabel}>Loại nhà</Text>
                 <View style={styles.typeToggleRow}>
@@ -380,6 +454,61 @@ export function PropertyListScreen({
                         }
                       >
                         <Text style={[styles.quickChipText, active && styles.quickChipTextActive]}>{chip.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.filterGroupLabel}>Khác</Text>
+                <Field label="Chiều ngang tối thiểu (m)">
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="decimal-pad"
+                    value={formatFilterNumber(filters.width_min)}
+                    onChangeText={(value) =>
+                      onChangeFilter({ width_min: value.trim() ? parseNumberInput(value) : undefined })
+                    }
+                    placeholder="VD: 4.5"
+                  />
+                </Field>
+                <View style={styles.typeToggleRow}>
+                  {sellingStatusCode ? (
+                    <Pressable
+                      style={[styles.typeToggleButton, filters.status === sellingStatusCode && styles.typeToggleButtonActive]}
+                      onPress={() =>
+                        onChangeFilter({ status: filters.status === sellingStatusCode ? "" : sellingStatusCode })
+                      }
+                    >
+                      <Text style={[styles.typeToggleText, filters.status === sellingStatusCode && styles.typeToggleTextActive]}>
+                        Đang bán
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {soldStatusCode ? (
+                    <Pressable
+                      style={[styles.typeToggleButton, filters.status === soldStatusCode && styles.typeToggleButtonActive]}
+                      onPress={() =>
+                        onChangeFilter({ status: filters.status === soldStatusCode ? "" : soldStatusCode })
+                      }
+                    >
+                      <Text style={[styles.typeToggleText, filters.status === soldStatusCode && styles.typeToggleTextActive]}>
+                        Đã bán
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+
+                <Text style={styles.filterGroupLabel}>Sắp xếp</Text>
+                <View style={styles.typeToggleRow}>
+                  {SORT_OPTIONS.map((option) => {
+                    const active = currentSort === option.value;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        style={[styles.typeToggleButton, active && styles.typeToggleButtonActive]}
+                        onPress={() => onChangeFilter({ sort: option.value })}
+                      >
+                        <Text style={[styles.typeToggleText, active && styles.typeToggleTextActive]}>{option.label}</Text>
                       </Pressable>
                     );
                   })}

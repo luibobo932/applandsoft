@@ -83,13 +83,17 @@ export type PropertyDetail = PropertySummary & {
 export type PropertyFilters = {
   keyword?: string;
   district?: string;
+  districts?: string; // nhieu quan, ngan cach dau phay
   ward?: string;
+  street?: string;
   status?: string;
   property_type?: string;
   price_min?: number;
   price_max?: number;
   area_min?: number;
   area_max?: number;
+  width_min?: number;
+  sort?: string;
   page?: number;
   page_size?: number;
 };

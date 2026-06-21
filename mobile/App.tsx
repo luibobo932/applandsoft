@@ -93,6 +93,7 @@ const emptyFilters: PropertyFilters = {
   price_max: undefined,
   area_min: undefined,
   area_max: undefined,
+  sort: "newest",
   page: 1,
   page_size: 50,
 };

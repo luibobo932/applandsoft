@@ -49,13 +49,17 @@ class PropertyDetail(PropertySummary):
 class PropertyFilters(BaseModel):
     keyword: str | None = None
     district: str | None = None
+    districts: str | None = None
     ward: str | None = None
+    street: str | None = None
     status: str | None = None
     property_type: str | None = None
     price_min: float | None = None
     price_max: float | None = None
     area_min: float | None = None
     area_max: float | None = None
+    width_min: float | None = None
+    sort: str | None = None
     page: int = 1
     page_size: int = 20
 
