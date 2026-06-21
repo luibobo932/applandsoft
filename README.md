@@ -39,3 +39,13 @@ npx expo start --tunnel
 - `backend/config/landsoft_mapping.local.yaml`
 - `backend/data/discovery/*.json`
 - `backend/docs/DISCOVERY_STATUS.md`
+
+## Chay doc lap khong can laptop
+
+Tai lieu dua backend len Windows Server 24/7:
+
+- `WINDOWS_SERVER_24X7.md`
+
+Script build APK tro toi backend tren server:
+
+- `runtime/build_server_apk.ps1`

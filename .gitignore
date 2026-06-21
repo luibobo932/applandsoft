@@ -12,6 +12,8 @@ __pycache__/
 backend/.env
 backend/config/local_app_users.json
 backend/data/audit.log
+backend/data/*.log
+backend/data/discovery/
 
 # Mobile local data
 mobile/node_modules/
