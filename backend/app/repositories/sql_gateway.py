@@ -17,7 +17,7 @@ class SqlLandsoftGateway:
         LEFT JOIN dbo.LoaiBDS lbds ON lbds.MaLBDS = bc.MaLBDS
         LEFT JOIN dbo.mglbcTrangThai tt ON tt.MaTT = bc.MaTT
         LEFT JOIN dbo.KhachHang kh ON kh.MaKH = bc.MaKH
-        WHERE 1 = 1
+        WHERE bc.KichHoat = 1
     """
 
     LIST_SELECT_SQL = """

@@ -16,15 +16,12 @@ import { styles } from "../styles";
 import {
   buildRangeLabel,
   cleanDisplayText,
-  formatArea,
   formatCount,
   formatFilterNumber,
   formatMoney,
   parseNumberInput,
   pickLabel,
-  splitAddress,
   getStatusTone,
-  getInitials,
 } from "../utils";
 import { LookupCollections, PropertyFilters, PropertySummary } from "../types";
 
@@ -307,139 +304,55 @@ export function PropertyListScreen({
         }
         renderItem={({ item }) => {
           const statusTone = getStatusTone(item.status_name);
-          const locationLine = [cleanDisplayText(item.district_name, ""), cleanDisplayText(item.ward_name, "")]
-            .filter(Boolean)
-            .join(" • ");
-          const addressParts = splitAddress(item.address);
           const ownerName = cleanDisplayText(item.owner_name, "");
           const phone = cleanDisplayText(item.contact_phone, "");
-          const dims = [
-            item.width && item.width > 0 ? `${item.width}m` : null,
-            item.length && item.length > 0 ? `${item.length}m` : null,
-          ].filter(Boolean).join(" × ");
+          const district = cleanDisplayText(item.district_name, "");
+          const dims =
+            item.width && item.width > 0 && item.length && item.length > 0
+              ? `${item.width}x${item.length}m`
+              : item.area && item.area > 0
+              ? `${item.area}m²`
+              : null;
+          const price = formatMoney(item.price);
+          const mainParts = [
+            cleanDisplayText(item.title, cleanDisplayText(item.address, item.code)),
+            district,
+            dims ? `DT:(${dims})` : null,
+            `giá ${price}`,
+          ].filter(Boolean);
+          const contactLine = [ownerName, phone].filter(Boolean).join(": ");
           return (
-            <View style={styles.propertyRow}>
-              <Pressable style={styles.propertyCardTapArea} onPress={() => onOpenProperty(item.landsoft_id)}>
-                {/* Hero strip */}
-                <View style={styles.propertyHero}>
-                  <View style={styles.propertyHeroTop}>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        styles.propertyHeroStatus,
-                        {
-                          backgroundColor: statusTone.backgroundColor,
-                          borderColor: statusTone.borderColor,
-                        },
-                      ]}
+            <Pressable style={styles.compactCard} onPress={() => onOpenProperty(item.landsoft_id)}>
+              <View style={styles.compactCardBody}>
+                <Text style={styles.compactCardMain} numberOfLines={2}>
+                  {mainParts.join(" ")}
+                </Text>
+                <View style={styles.compactCardContactRow}>
+                  <Text style={styles.compactCardContact} numberOfLines={1}>
+                    {contactLine || "Chưa có liên hệ"}
+                  </Text>
+                  {phone ? (
+                    <Pressable
+                      style={styles.compactCardPhoneBtn}
+                      onPress={() => void onQuickViewPhone(item.landsoft_id)}
+                      hitSlop={8}
                     >
-                      <Text style={[styles.statusBadgeText, { color: statusTone.color }]}>
-                        {cleanDisplayText(item.status_name, "Chưa rõ")}
-                      </Text>
-                    </View>
-                    <View style={styles.propertyHeroTopActions}>
-                      <View style={styles.propertyCodePill}>
-                        <Text style={styles.propertyCode}>{item.code}</Text>
-                      </View>
-                    </View>
-                  </View>
-                  {/* Owner + phone row in hero */}
-                  <View style={styles.propertyHeroContact}>
-                    <View style={styles.propertyHeroContactBadge}>
-                      <Text style={styles.propertyHeroContactInitials}>{getInitials(ownerName || "?", "?")}</Text>
-                    </View>
-                    <View style={styles.propertyHeroContactInfo}>
-                      <Text style={styles.propertyHeroContactName} numberOfLines={1}>
-                        {ownerName || "Chưa có chủ nhà"}
-                      </Text>
-                      {phone ? (
-                        <Text style={styles.propertyHeroContactPhone}>{phone}</Text>
-                      ) : (
-                        <Text style={styles.propertyHeroContactPhoneMissing}>Chưa có SĐT</Text>
-                      )}
-                    </View>
-                    {phone ? (
-                      <Pressable
-                        style={styles.propertyHeroPhoneButton}
-                        onPress={() => void onQuickViewPhone(item.landsoft_id)}
-                      >
-                        <Feather name="phone" size={16} color="#F37021" />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                </View>
-
-                {/* Body */}
-                <View style={styles.propertyBody}>
-                  <View style={styles.propertyPriceRow}>
-                    <Text style={styles.propertyPrice}>{formatMoney(item.price)}</Text>
-                    {dims ? (
-                      <View style={styles.propertyUpdatedChip}>
-                        <Text style={styles.propertyUpdatedChipText}>{dims}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.propertyTitle} numberOfLines={2}>
-                    {cleanDisplayText(item.title, "Chưa có tiêu đề")}
-                  </Text>
-                  <Text style={styles.propertyLocation} numberOfLines={1}>
-                    {locationLine || "Chưa rõ khu vực"}
-                  </Text>
-                  <Text style={styles.propertyAddressPrimary} numberOfLines={1}>
-                    {addressParts.primary}
-                  </Text>
-                  {addressParts.secondary ? (
-                    <Text style={styles.propertyAddressSecondary} numberOfLines={1}>
-                      {addressParts.secondary}
-                    </Text>
+                      <Feather name="phone" size={14} color="#F37021" />
+                    </Pressable>
                   ) : null}
-                  <View style={styles.propertyFactsRow}>
-                    <View style={styles.propertyFact}>
-                      <Feather name="maximize" size={14} color="#8B9AB0" />
-                      <Text style={styles.propertyFactText}>{formatArea(item.area)}</Text>
-                    </View>
-                    {dims ? (
-                      <View style={styles.propertyFact}>
-                        <Feather name="move" size={14} color="#8B9AB0" />
-                        <Text style={styles.propertyFactText}>{dims}</Text>
-                      </View>
-                    ) : null}
-                    {item.district_name ? (
-                      <View style={styles.propertyFact}>
-                        <Feather name="map-pin" size={14} color="#8B9AB0" />
-                        <Text style={styles.propertyFactText}>{cleanDisplayText(item.district_name)}</Text>
-                      </View>
-                    ) : null}
-                    {item.ward_name ? (
-                      <View style={styles.propertyFact}>
-                        <Feather name="layers" size={14} color="#8B9AB0" />
-                        <Text style={styles.propertyFactText}>{cleanDisplayText(item.ward_name)}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.propertySnippet} numberOfLines={2}>
-                    {cleanDisplayText(item.description, "Không có mô tả")}
-                  </Text>
-                </View>
-              </Pressable>
-
-              {/* Action bar */}
-              <View style={styles.propertyActionBar}>
-                <View style={styles.propertyActionRow}>
-                  <Pressable style={styles.propertyPrimaryAction} onPress={() => onOpenProperty(item.landsoft_id)}>
-                    <Feather name="edit-3" size={16} color="#ffffff" />
-                    <Text style={styles.propertyPrimaryActionText}>Mở hồ sơ</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.propertySecondaryAction}
-                    onPress={() => void onQuickViewPhone(item.landsoft_id)}
-                  >
-                    <Feather name="phone" size={15} color="#17305D" />
-                    <Text style={styles.propertySecondaryActionText}>Xem số</Text>
-                  </Pressable>
                 </View>
               </View>
-            </View>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: statusTone.backgroundColor, borderColor: statusTone.borderColor, alignSelf: "flex-start" },
+                ]}
+              >
+                <Text style={[styles.statusBadgeText, { color: statusTone.color }]}>
+                  {cleanDisplayText(item.status_name, "?")}
+                </Text>
+              </View>
+            </Pressable>
           );
         }}
       />
