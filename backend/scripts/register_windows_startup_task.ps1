@@ -1,9 +1,13 @@
-$ErrorActionPreference = "Stop"
-
 param(
     [string]$TaskName = "LandsoftMobileBackend",
     [string]$WorkingRoot = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 )
+
+$ErrorActionPreference = "Stop"
+
+if (-not (Test-Path -LiteralPath $WorkingRoot)) {
+    throw "Khong tim thay thu muc project: $WorkingRoot"
+}
 
 $backendDir = Join-Path $WorkingRoot "backend"
 $runnerPath = Join-Path $backendDir "scripts\run_backend_server.ps1"

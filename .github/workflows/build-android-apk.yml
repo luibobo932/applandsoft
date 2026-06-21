@@ -1,0 +1,70 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "Backend production, vi du https://landsoft-api.example.com/api/v1"
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_API_BASE_URL: ${{ inputs.api_base_url }}
+      NODE_ENV: production
+
+    steps:
+      - name: Lay source
+        uses: actions/checkout@v4
+
+      - name: Kiem tra backend production
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$EXPO_PUBLIC_API_BASE_URL" in
+            http://*/api/v1|https://*/api/v1) ;;
+            *) echo "api_base_url phai ket thuc bang /api/v1"; exit 1 ;;
+          esac
+          SERVER_ROOT="${EXPO_PUBLIC_API_BASE_URL%/api/v1}"
+          curl --fail --silent --show-error --retry 3 "$SERVER_ROOT/health"
+          curl --fail --silent --show-error --retry 3 "$SERVER_ROOT/ready"
+
+      - name: Cai Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Cai Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Cai dependencies va kiem tra TypeScript
+        working-directory: mobile
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+      - name: Build APK release
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew generateCodegenArtifactsFromSchema assembleRelease --no-daemon
+
+      - name: Dat ten APK
+        run: cp mobile/android/app/build/outputs/apk/release/app-release.apk landsoft-mobile.apk
+
+      - name: Luu APK de tai xuong
+        uses: actions/upload-artifact@v4
+        with:
+          name: landsoft-mobile-apk
+          path: landsoft-mobile.apk
+          if-no-files-found: error
+          retention-days: 30

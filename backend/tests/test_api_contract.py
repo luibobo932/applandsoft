@@ -31,6 +31,16 @@ def test_login_success() -> None:
     assert response.json()["user"]["landsoft_user_id"] == 490
 
 
+def test_health_and_readiness() -> None:
+    health_response = client.get("/health")
+    assert health_response.status_code == 200
+    assert health_response.json()["ok"] is True
+
+    ready_response = client.get("/ready")
+    assert ready_response.status_code == 200
+    assert ready_response.json() == {"ok": True, "mode": "stub"}
+
+
 def test_login_fail() -> None:
     response = client.post("/api/v1/auth/login", json={"username": "SKL-473", "password": "sai"})
     assert response.status_code == 401

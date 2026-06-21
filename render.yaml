@@ -4,18 +4,28 @@ services:
     runtime: docker
     rootDir: backend
     plan: starter
-    autoDeploy: false
-    healthCheckPath: /health
+    autoDeploy: true
+    healthCheckPath: /ready
     envVars:
       - key: APP_ENV
         value: production
+      - key: JWT_SECRET
+        generateValue: true
       - key: USE_STUB_GATEWAY
-        value: false
+        value: "false"
       - key: SQL_DRIVER
         value: ODBC Driver 18 for SQL Server
+      - key: SQL_SERVER
+        sync: false
       - key: SQL_PORT
-        value: 1433
+        value: "1433"
+      - key: SQL_DATABASE
+        sync: false
+      - key: SQL_USERNAME
+        sync: false
+      - key: SQL_PASSWORD
+        sync: false
       - key: SQL_ENCRYPT
-        value: no
+        value: "no"
       - key: SQL_TRUST_SERVER_CERT
-        value: yes
+        value: "yes"

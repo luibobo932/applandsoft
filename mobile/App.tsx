@@ -105,7 +105,7 @@ function getPreferredApiBaseUrl(storedApiBaseUrl?: string | null): string {
     }
     return setApiBaseUrl(EMULATOR_API_BASE_URL);
   }
-  // Tren dien thoai that: luon dung URL Tailscale gan san, bo qua gia tri cu da luu
+  // Tren dien thoai that: luon dung URL production da dong trong APK.
   return setApiBaseUrl(defaultApiBaseUrl);
 }
 

@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from app.core.config import get_settings
+from app.db.sqlserver import check_sql_connection
 from app.routers import activity, auth, lookups, me, properties
 
 
@@ -32,6 +33,28 @@ def create_app() -> FastAPI:
             "env": settings.app_env,
             "stub_gateway": settings.use_stub_gateway,
         }
+
+    @app.get("/ready", tags=["system"])
+    def readiness() -> JSONResponse:
+        config_errors = settings.production_config_errors
+        if config_errors:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"ok": False, "reason": "invalid_config", "errors": config_errors},
+            )
+
+        if settings.use_stub_gateway:
+            return JSONResponse(content={"ok": True, "mode": "stub"})
+
+        try:
+            check_sql_connection()
+        except Exception:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"ok": False, "reason": "sql_unavailable"},
+            )
+
+        return JSONResponse(content={"ok": True, "mode": "landsoft-sql"})
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def landing_page(request: Request) -> str:

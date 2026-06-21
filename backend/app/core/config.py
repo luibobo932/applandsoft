@@ -75,6 +75,19 @@ class Settings(BaseSettings):
         )
 
     @property
+    def production_config_errors(self) -> list[str]:
+        errors: list[str] = []
+        if self.app_env.casefold() != "production":
+            return errors
+        if self.use_stub_gateway:
+            errors.append("USE_STUB_GATEWAY phai la false trong production.")
+        if not self.has_sql_credentials:
+            errors.append("Thieu SQL_SERVER, SQL_DATABASE, SQL_USERNAME hoac SQL_PASSWORD.")
+        if not self.jwt_secret.strip() or self.jwt_secret == "change-me":
+            errors.append("JWT_SECRET chua duoc cau hinh an toan.")
+        return errors
+
+    @property
     def sql_connection_string(self) -> str:
         return (
             f"DRIVER={{{self.sql_driver}}};"

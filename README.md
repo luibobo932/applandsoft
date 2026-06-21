@@ -1,55 +1,44 @@
 # Landsoft Mobile
 
-App Android độc lập cho Landsoft theo mô hình:
+App Android doc lap de xem kho nha va nhap nha truc tiep vao SQL Server Landsoft.
 
-- `backend/`: FastAPI trung gian kết nối SQL Server Landsoft
-- `mobile/`: Expo React Native cho Android
+## Thanh phan
 
-## Trạng thái hiện tại
+- `backend/`: FastAPI ket noi truc tiep SQL Server Landsoft.
+- `mobile/`: React Native + Expo cho Android.
+- `render.yaml`: cau hinh backend production tren Render.
+- `.github/workflows/build-android-apk.yml`: build APK tren GitHub.
 
-- Backend contract v1 đã dựng xong và có test stub
-- Mobile v1 đã có 5 màn hình:
-  - Đăng nhập
-  - Kho hàng
-  - Chi tiết căn
-  - Nhập nhà mới
-  - Lịch sử thao tác gần đây
-- Discovery SQL đã có script nhưng chưa chạy với SQL credentials thật
+## Trang thai ky thuat
 
-## Chạy backend local
+- Dang nhap bang user Landsoft va key giai ma password.
+- Doc danh sach, chi tiet, so dien thoai va lookup tu DB that.
+- Cap nhat trang thai, them ghi chu va tao nha moi qua service backend.
+- APK release khong con fallback ve IP laptop.
+- Backend co hai endpoint kiem tra:
+  - `/health`: tien trinh API dang chay.
+  - `/ready`: production hop le va SQL Server dang ket noi duoc.
+
+## Chay backend local
 
 ```powershell
-cd D:\12. Tools\anthitphanmem\landsoft-mobile\backend
+cd "D:\12. Tools\anthitphanmem\landsoft-mobile\backend"
 python -m pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## Chạy mobile local
+## Build APK tro toi backend production
 
 ```powershell
-cd D:\12. Tools\anthitphanmem\landsoft-mobile\mobile
-Copy-Item .env.example .env
-npm install
-npx expo start --tunnel
+cd "D:\12. Tools\anthitphanmem\landsoft-mobile"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\runtime\build_server_apk.ps1 `
+  -ServerApiBaseUrl "https://backend-cua-ban/api/v1"
 ```
 
-## Các file cần chốt trước khi nối DB Landsoft thật
-
-- `backend/.env`
-- `backend/config/landsoft_mapping.local.yaml`
-- `backend/data/discovery/*.json`
-- `backend/docs/DISCOVERY_STATUS.md`
+Script chi build khi `/health` va `/ready` cua backend deu thanh cong.
 
 ## Chay doc lap khong can laptop
 
-Tai lieu dua backend len Windows Server 24/7:
-
-- `WINDOWS_SERVER_24X7.md`
-
-Script build APK tro toi backend tren server:
-
-- `runtime/build_server_apk.ps1`
-
-Script xuat bootstrap tu laptop hien tai sang server:
-
-- `backend/scripts/export_server_bootstrap.py`
+- Windows Server: xem `WINDOWS_SERVER_24X7.md`.
+- Xuat cau hinh tu laptop: `backend/scripts/export_server_bootstrap.py`.
+- Cloud Render: mo Blueprint tu repo GitHub va dien cac bien SQL duoc danh dau `sync: false`.
