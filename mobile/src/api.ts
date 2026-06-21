@@ -24,6 +24,12 @@ export class ApiError extends Error {
 
 const REQUEST_TIMEOUT_MS = 10000;
 
+let unauthorizedHandler: (() => void) | null = null;
+
+export function registerUnauthorizedHandler(handler: () => void): void {
+  unauthorizedHandler = handler;
+}
+
 async function request<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
@@ -54,6 +60,9 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   }
 
   if (!response.ok) {
+    if (response.status === 401 && unauthorizedHandler) {
+      unauthorizedHandler();
+    }
     const detail = payload?.detail;
     const message = typeof detail === "string" ? detail : `API lỗi ${response.status}`;
     throw new ApiError(message, response.status);
