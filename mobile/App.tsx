@@ -39,6 +39,7 @@ import {
 } from "./src/types";
 
 const SESSION_KEY = "landsoft_mobile_session";
+const CREDS_KEY = "landsoft_mobile_creds";
 const CREATE_DRAFT_KEY = "landsoft_mobile_create_draft";
 const API_BASE_URL_KEY = "landsoft_mobile_api_base_url";
 const DEBUG_AUTO_LOGIN_USER = process.env.EXPO_PUBLIC_DEBUG_AUTO_LOGIN_USER?.trim();
@@ -129,7 +130,8 @@ export default function App() {
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(() => getPreferredApiBaseUrl());
 
   const handleLogout = useCallback(async () => {
-    await AsyncStorage.removeItem(SESSION_KEY);
+    // Xoa ca creds da luu de khong tu dang nhap lai sau khi nguoi dung chu dong dang xuat
+    await AsyncStorage.multiRemove([SESSION_KEY, CREDS_KEY]);
     setSession(null);
     setProperties([]);
     setActivityItems([]);
@@ -184,18 +186,39 @@ export default function App() {
         AsyncStorage.getItem(API_BASE_URL_KEY),
       ]);
       setApiBaseUrlInput(getPreferredApiBaseUrl(storedApiBaseUrl));
+      const storedCreds = await AsyncStorage.getItem(CREDS_KEY);
+
+      let activeSession: SessionState | null = null;
+
+      // 1. Dung lai phien da luu neu token con han
       if (storedSession) {
-        const parsed: SessionState = JSON.parse(storedSession);
-        const currentUser = await fetchMe(parsed.token);
-        setSession({ token: parsed.token, user: currentUser });
-      } else if (DEBUG_AUTO_LOGIN_USER && DEBUG_AUTO_LOGIN_PASSWORD) {
-        const response = await login({
-          username: DEBUG_AUTO_LOGIN_USER,
-          password: DEBUG_AUTO_LOGIN_PASSWORD,
-        });
-        const nextSession = { token: response.access_token, user: response.user };
-        await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
-        setSession(nextSession);
+        try {
+          const parsed: SessionState = JSON.parse(storedSession);
+          const currentUser = await fetchMe(parsed.token);
+          activeSession = { token: parsed.token, user: currentUser };
+        } catch {
+          await AsyncStorage.removeItem(SESSION_KEY);
+        }
+      }
+
+      // 2. Khong co phien hoac token het han -> tu dang nhap lai (creds da luu, hoac creds dong san)
+      if (!activeSession) {
+        const creds = storedCreds ? JSON.parse(storedCreds) : null;
+        const username = creds?.username ?? DEBUG_AUTO_LOGIN_USER;
+        const password = creds?.password ?? DEBUG_AUTO_LOGIN_PASSWORD;
+        if (username && password) {
+          try {
+            const response = await login({ username, password });
+            activeSession = { token: response.access_token, user: response.user };
+            await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(activeSession));
+          } catch {
+            await AsyncStorage.removeItem(CREDS_KEY);
+          }
+        }
+      }
+
+      if (activeSession) {
+        setSession(activeSession);
       }
       if (storedDraft) {
         setDraft({ ...emptyDraft, ...JSON.parse(storedDraft) });
@@ -322,6 +345,11 @@ export default function App() {
 
       const nextSession = { token: response.access_token, user: response.user };
       await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+      // Nho tai khoan de cac lan sau tu dang nhap, khong phai nhap lai
+      await AsyncStorage.setItem(
+        CREDS_KEY,
+        JSON.stringify({ username: payload.username, password: payload.password })
+      );
       setSession(nextSession);
     } catch (error) {
       Alert.alert("Đăng nhập thất bại", normalizeApiError(error));
