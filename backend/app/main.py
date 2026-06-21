@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 
 from app.core.config import get_settings
 from app.db.sqlserver import check_sql_connection
@@ -65,9 +65,9 @@ def create_app() -> FastAPI:
     def landing_page(request: Request) -> str:
         api_url = f"{request.base_url}api/v1".rstrip("/")
         base_url = str(request.base_url).rstrip("/")
-        apk_exists = settings.android_apk_file.exists()
+        apk_exists = bool(settings.android_apk_download_url) or settings.android_apk_file.exists()
         apk_note = "APK Android da san sang de tai." if apk_exists else "APK chua duoc build tren may chu nay."
-        apk_url = f"{base_url}/download/android"
+        apk_url = settings.android_apk_download_url or f"{base_url}/download/android"
         return f"""
 <!DOCTYPE html>
 <html lang="vi">
@@ -185,7 +185,9 @@ def create_app() -> FastAPI:
 """
 
     @app.get("/download/android", include_in_schema=False)
-    def download_android_apk() -> FileResponse:
+    def download_android_apk():
+        if settings.android_apk_download_url:
+            return RedirectResponse(settings.android_apk_download_url)
         apk_file = settings.android_apk_file
         if not apk_file.exists():
             return HTMLResponse("APK chua san sang tren may chu nay.", status_code=404)

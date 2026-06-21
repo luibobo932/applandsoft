@@ -41,6 +41,12 @@ def test_health_and_readiness() -> None:
     assert ready_response.json() == {"ok": True, "mode": "stub"}
 
 
+def test_landing_page_has_apk_download() -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "landsoft-mobile-v1.0.0.apk" in response.text
+
+
 def test_login_fail() -> None:
     response = client.post("/api/v1/auth/login", json={"username": "SKL-473", "password": "sai"})
     assert response.status_code == 401

@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     discovery_output_dir: str = "./data/discovery"
     audit_log_path: str = "./data/audit.log"
     android_apk_path: str = "../mobile/android/app/build/outputs/apk/release/app-release.apk"
+    android_apk_download_url: str = (
+        "https://github.com/luibobo932/applandsoft/releases/download/v1.0.0/"
+        "landsoft-mobile-v1.0.0.apk"
+    )
 
     sql_driver: str = "ODBC Driver 18 for SQL Server"
     sql_server: str = ""
