@@ -22,7 +22,8 @@ export class ApiError extends Error {
   }
 }
 
-const REQUEST_TIMEOUT_MS = 10000;
+// 45s de chiu duoc Render free tier khoi dong nguoi (~30-50s) khi app mo sau thoi gian khong dung
+const REQUEST_TIMEOUT_MS = 45000;
 
 let unauthorizedHandler: (() => void) | null = null;
 
