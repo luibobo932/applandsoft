@@ -121,9 +121,16 @@ export type PropertyCreatePayload = {
   area: number;
   width?: number;
   length?: number;
+  road_width?: number;
+  floors?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  living_rooms?: number;
   legal_status_code?: string;
   direction_code?: string;
   grade_code?: string;
+  negotiable?: boolean;
+  direct_owner?: boolean;
   description?: string;
   note?: string;
   listing_type?: string;

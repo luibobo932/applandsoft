@@ -20,6 +20,7 @@ import { LoginScreen } from "./src/screens/LoginScreen";
 import { PropertyListScreen } from "./src/screens/PropertyListScreen";
 import { PropertyDetailScreen } from "./src/screens/PropertyDetailScreen";
 import { CreatePropertyScreen } from "./src/screens/CreatePropertyScreen";
+import { LandsoftFormScreen } from "./src/screens/LandsoftFormScreen";
 import { ActivityScreen } from "./src/screens/ActivityScreen";
 import { styles } from "./src/styles";
 import {
@@ -66,9 +67,16 @@ const emptyDraft: PropertyCreatePayload = {
   area: 0,
   width: 0,
   length: 0,
+  road_width: 0,
+  floors: 0,
+  bedrooms: 0,
+  bathrooms: 0,
+  living_rooms: 0,
   legal_status_code: "",
   direction_code: "",
   grade_code: "",
+  negotiable: false,
+  direct_owner: false,
   description: "",
   note: "",
   listing_type: "ban",
@@ -122,6 +130,7 @@ export default function App() {
   const [filters, setFilters] = useState<PropertyFilters>(emptyFilters);
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("properties");
+  const [createMode, setCreateMode] = useState<"quick" | "full">("quick");
   const [propertyLoading, setPropertyLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -468,14 +477,31 @@ export default function App() {
         />
       ) : null}
 
-      {activeTab === "create" ? (
+      {activeTab === "create" && createMode === "quick" ? (
         <CreatePropertyScreen
           token={session.token}
           lookups={lookups}
           draft={draft}
           savingDraft={savingDraft}
           onChangeDraft={updateDraft}
+          onOpenFullForm={() => setCreateMode("full")}
           onSubmitSuccess={async () => {
+            setActiveTab("properties");
+            await Promise.all([loadProperties(session.token, filters), loadActivity(session.token)]);
+          }}
+        />
+      ) : null}
+
+      {activeTab === "create" && createMode === "full" ? (
+        <LandsoftFormScreen
+          token={session.token}
+          lookups={lookups}
+          draft={draft}
+          savingDraft={savingDraft}
+          onChangeDraft={updateDraft}
+          onBack={() => setCreateMode("quick")}
+          onSubmitSuccess={async () => {
+            setCreateMode("quick");
             setActiveTab("properties");
             await Promise.all([loadProperties(session.token, filters), loadActivity(session.token)]);
           }}
