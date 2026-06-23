@@ -760,6 +760,16 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     color: "#6B7FA3",
   },
+  propCardDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 1,
+  },
+  propCardDate: {
+    fontSize: 12,
+    color: "#94A3B8",
+  },
   propCardPhoneBtn: {
     padding: 2,
   },

@@ -80,6 +80,19 @@ function buildQuery(filters: PropertyFilters): string {
     }
     query.append(key, String(value));
   });
+
+  // Tuong thich backend cu: neu chi co param 'nhieu' (districts/property_types) thi gui kem
+  // ban don le (district/property_type) de backend cu van loc duoc truong hop 1 lua chon.
+  // Backend moi uu tien ban 'nhieu' nen khong xung dot.
+  const districtCodes = (filters.districts ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (districtCodes.length > 0 && !filters.district) {
+    query.set("district", districtCodes[0]);
+  }
+  const typeCodes = (filters.property_types ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (typeCodes.length === 1 && !filters.property_type) {
+    query.set("property_type", typeCodes[0]);
+  }
+
   const queryText = query.toString();
   return queryText ? `?${queryText}` : "";
 }

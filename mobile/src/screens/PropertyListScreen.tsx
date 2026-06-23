@@ -18,6 +18,7 @@ import {
   buildRangeLabel,
   cleanDisplayText,
   formatCount,
+  formatDateTime,
   formatFilterNumber,
   formatMoney,
   parseNumberInput,
@@ -597,6 +598,7 @@ export function PropertyListScreen({
           const location = [ward, district].filter(Boolean).join(" · ");
           const locationLine = [address, location].filter(Boolean).join(", ")
             || cleanDisplayText(item.title, item.code);
+          const createdAt = formatDateTime(item.created_at);
           return (
             <Pressable style={styles.propCard} onPress={() => onOpenProperty(item.landsoft_id)}>
               {/* Row 1: giá + dims + status */}
@@ -628,6 +630,13 @@ export function PropertyListScreen({
                   </Pressable>
                 ) : null}
               </View>
+              {/* Row 4: ngày giờ nhập */}
+              {createdAt ? (
+                <View style={styles.propCardDateRow}>
+                  <Feather name="clock" size={11} color="#94A3B8" />
+                  <Text style={styles.propCardDate}>Nhập: {createdAt}</Text>
+                </View>
+              ) : null}
             </Pressable>
           );
         }}

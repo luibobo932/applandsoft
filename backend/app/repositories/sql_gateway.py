@@ -46,7 +46,8 @@ class SqlLandsoftGateway:
             LTRIM(RTRIM(COALESCE(kh.HoKH, N'') + CASE WHEN ISNULL(kh.HoKH, N'') <> N'' AND ISNULL(kh.TenKH, N'') <> N'' THEN N' ' ELSE N'' END + COALESCE(kh.TenKH, N''))) AS owner_name,
             COALESCE(NULLIF(kh.DiDong, N''), NULLIF(bc.DienThoaiNDD, N''), N'') AS contact_phone,
             CAST(COALESCE(NULLIF(bc.NgangKV, 0), 0) AS float) AS width,
-            CAST(COALESCE(NULLIF(bc.DaiKV, 0), 0) AS float) AS length
+            CAST(COALESCE(NULLIF(bc.DaiKV, 0), 0) AS float) AS length,
+            bc.NgayDK AS created_at
     """
 
     DETAIL_SQL = """

@@ -55,6 +55,7 @@ export type PropertySummary = {
   contact_phone?: string | null;
   width?: number | null;
   length?: number | null;
+  created_at?: string | null;
 };
 
 export type PropertyNote = {

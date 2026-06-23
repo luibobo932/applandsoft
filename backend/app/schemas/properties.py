@@ -21,6 +21,7 @@ class PropertySummary(BaseModel):
     contact_phone: str | None = None
     width: float | None = None
     length: float | None = None
+    created_at: datetime | None = None
 
 
 class PropertyNote(BaseModel):
