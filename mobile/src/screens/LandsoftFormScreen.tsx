@@ -1,12 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { Field, Section, SelectField } from "../components/shared";
 import { styles } from "../styles";
 import { normalizeApiError, parseNumberInput } from "../utils";
-import { createProperty } from "../api";
+import { checkPhoneExists, createProperty } from "../api";
 import { LookupCollections, PropertyCreatePayload } from "../types";
 
 const CREATE_DRAFT_KEY = "landsoft_mobile_create_draft";
@@ -101,10 +101,34 @@ export function LandsoftFormScreen({
 
   // Kiem tra SDT trung (giong Landsoft: o do len)
   const phoneNorm = normalizePhone(draft.contact_phone);
-  const phoneDup =
+  const phoneDupLocal =
     phoneNorm.length >= 9 &&
     existingPhones.some((p) => normalizePhone(p) === phoneNorm);
 
+  // Check trung TOAN BO kho qua backend (debounce 600ms)
+  const [phoneDupServer, setPhoneDupServer] = useState(0);
+  useEffect(() => {
+    if (phoneNorm.length < 9) {
+      setPhoneDupServer(0);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      checkPhoneExists(token, phoneNorm)
+        .then((count) => {
+          if (!cancelled) setPhoneDupServer(count);
+        })
+        .catch(() => {
+          if (!cancelled) setPhoneDupServer(0);
+        });
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [phoneNorm, token]);
+
+  const phoneDup = phoneDupLocal || phoneDupServer > 0;
   const giaQuyDoi = formatGiaQuyDoi(draft.price);
 
   const validate = (): string | null => {
@@ -327,7 +351,11 @@ export function LandsoftFormScreen({
             placeholder="0911.380.022"
           />
           {phoneDup ? (
-            <Text style={styles.lsPhoneDupWarn}>⚠ SĐT đã có trong hệ thống</Text>
+            <Text style={styles.lsPhoneDupWarn}>
+              {phoneDupServer > 0
+                ? `⚠ SĐT đã có ${phoneDupServer} tin trong hệ thống`
+                : "⚠ SĐT đã có trong hệ thống"}
+            </Text>
           ) : null}
         </Field>
       </Section>
