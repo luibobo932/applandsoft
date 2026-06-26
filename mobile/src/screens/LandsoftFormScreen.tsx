@@ -57,21 +57,40 @@ function CheckRow({
   );
 }
 
+// Chuan hoa SDT de so sanh trung (bo ky tu khong phai so, +84 -> 0)
+function normalizePhone(raw?: string | null): string {
+  let s = (raw ?? "").replace(/[^\d+]/g, "");
+  if (s.startsWith("+84")) s = "0" + s.slice(3);
+  else if (s.startsWith("84") && s.length >= 11) s = "0" + s.slice(2);
+  return s;
+}
+
+// Quy doi gia (ty) -> "X tỷ Y triệu" giong Landsoft "{0:0.#}"
+function formatGiaQuyDoi(priceTy?: number): string {
+  if (!priceTy || priceTy <= 0) return "";
+  const ty = Math.floor(priceTy);
+  const trieu = Math.round((priceTy - ty) * 1000);
+  const fmt = (n: number) => String(Number(n.toFixed(1)));
+  if (ty && trieu) return `= ${fmt(ty)} tỷ ${trieu} triệu`;
+  if (ty) return `= ${fmt(ty)} tỷ`;
+  return `= ${Math.round(priceTy * 1000)} triệu`;
+}
+
 export function LandsoftFormScreen({
   token,
   lookups,
   draft,
   savingDraft,
+  existingPhones = [],
   onChangeDraft,
-  onBack,
   onSubmitSuccess,
 }: {
   token: string;
   lookups: LookupCollections;
   draft: PropertyCreatePayload;
   savingDraft: boolean;
+  existingPhones?: string[];
   onChangeDraft: (patch: Partial<PropertyCreatePayload>) => void;
-  onBack: () => void;
   onSubmitSuccess: () => Promise<void>;
 }) {
   const [submitting, setSubmitting] = useState(false);
@@ -79,6 +98,14 @@ export function LandsoftFormScreen({
   const wardOptions = lookups.wards.filter(
     (item) => !draft.district_code || item.parent_code === draft.district_code
   );
+
+  // Kiem tra SDT trung (giong Landsoft: o do len)
+  const phoneNorm = normalizePhone(draft.contact_phone);
+  const phoneDup =
+    phoneNorm.length >= 9 &&
+    existingPhones.some((p) => normalizePhone(p) === phoneNorm);
+
+  const giaQuyDoi = formatGiaQuyDoi(draft.price);
 
   const validate = (): string | null => {
     if (!draft.address?.trim()) return "Thiếu số nhà / địa chỉ";
@@ -125,15 +152,10 @@ export function LandsoftFormScreen({
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       <View style={styles.detailTopBar}>
-        <Pressable style={styles.detailNavButton} onPress={onBack}>
-          <Feather name="arrow-left" size={20} color="#17305D" />
-          <Text style={styles.detailNavButtonText}>Nhập nhanh</Text>
-        </Pressable>
+        <Text style={styles.lsFormTitle}>Đăng ký bán, cho thuê</Text>
         {savingDraft ? <Text style={styles.createSavingText}>Đang lưu...</Text> : null}
       </View>
-
-      <Text style={styles.lsFormTitle}>Đăng ký bán, cho thuê</Text>
-      <Text style={styles.lsFormSubtitle}>Form đầy đủ theo Landsoft — nhập rồi đẩy thẳng vào hệ thống</Text>
+      <Text style={styles.lsFormSubtitle}>Nhập nhà mới — lưu thẳng vào hệ thống HomeApp</Text>
 
       {/* Nhu cau & phan loai */}
       <Section title="Nhu cầu & phân loại">
@@ -228,6 +250,7 @@ export function LandsoftFormScreen({
             onChangeText={(v) => onChangeDraft({ price: parseNumberInput(v) })}
             placeholder="VD: 11"
           />
+          {giaQuyDoi ? <Text style={styles.lsGiaQuyDoi}>{giaQuyDoi}</Text> : null}
         </Field>
         <Field label="Diện tích KV (m²)">
           <TextInput
@@ -297,12 +320,15 @@ export function LandsoftFormScreen({
         </Field>
         <Field label="Di động (*)">
           <TextInput
-            style={styles.input}
+            style={[styles.input, phoneDup && styles.inputDuplicate]}
             keyboardType="phone-pad"
             value={draft.contact_phone}
             onChangeText={(v) => onChangeDraft({ contact_phone: v })}
             placeholder="0911.380.022"
           />
+          {phoneDup ? (
+            <Text style={styles.lsPhoneDupWarn}>⚠ SĐT đã có trong hệ thống</Text>
+          ) : null}
         </Field>
       </Section>
 
@@ -343,7 +369,7 @@ export function LandsoftFormScreen({
           onPress={() => void submit()}
         >
           <Feather name="send" size={16} color="#fff" />
-          <Text style={styles.primaryButtonText}>{submitting ? "Đang gửi..." : "Đẩy vào Landsoft"}</Text>
+          <Text style={styles.primaryButtonText}>{submitting ? "Đang gửi..." : "Lưu vào HomeApp"}</Text>
         </Pressable>
         <Text style={styles.submitPanelDescription}>Trạng thái mặc định: Chờ duyệt</Text>
       </View>

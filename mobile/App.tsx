@@ -15,13 +15,13 @@ import {
   registerUnauthorizedHandler,
 } from "./src/api";
 import { defaultApiBaseUrl, getApiBaseUrl, setApiBaseUrl } from "./src/config";
-import { AppHeader, TabBar, TabKey } from "./src/components/shared";
+import { AppHeader, LandsoftNavBar, LandsoftView } from "./src/components/shared";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { PropertyListScreen } from "./src/screens/PropertyListScreen";
 import { PropertyDetailScreen } from "./src/screens/PropertyDetailScreen";
-import { CreatePropertyScreen } from "./src/screens/CreatePropertyScreen";
 import { LandsoftFormScreen } from "./src/screens/LandsoftFormScreen";
 import { ActivityScreen } from "./src/screens/ActivityScreen";
+import { LandsoftWorkspaceScreen } from "./src/screens/LandsoftWorkspaceScreen";
 import { styles } from "./src/styles";
 import {
   cleanDisplayText,
@@ -129,8 +129,7 @@ export default function App() {
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [filters, setFilters] = useState<PropertyFilters>(emptyFilters);
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>("properties");
-  const [createMode, setCreateMode] = useState<"quick" | "full">("quick");
+  const [activeTab, setActiveTab] = useState<LandsoftView>("workspace");
   const [propertyLoading, setPropertyLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -155,6 +154,9 @@ export default function App() {
   }, [handleLogout]);
 
   const title = useMemo(() => {
+    if (activeTab === "workspace") {
+      return "HomeApp";
+    }
     if (selectedPropertyId && activeTab === "properties") {
       return "Chi tiết căn";
     }
@@ -459,6 +461,18 @@ export default function App() {
         />
       ) : null}
 
+      {!selectedPropertyId && activeTab === "workspace" ? (
+        <LandsoftWorkspaceScreen
+          user={session.user}
+          propertyTotal={propertyTotal}
+          activityCount={activityItems.length}
+          onOpen={(view) => {
+            setSelectedPropertyId(null);
+            setActiveTab(view);
+          }}
+        />
+      ) : null}
+
       {!selectedPropertyId && activeTab === "properties" ? (
         <PropertyListScreen
           filters={filters}
@@ -477,31 +491,15 @@ export default function App() {
         />
       ) : null}
 
-      {activeTab === "create" && createMode === "quick" ? (
-        <CreatePropertyScreen
-          token={session.token}
-          lookups={lookups}
-          draft={draft}
-          savingDraft={savingDraft}
-          onChangeDraft={updateDraft}
-          onOpenFullForm={() => setCreateMode("full")}
-          onSubmitSuccess={async () => {
-            setActiveTab("properties");
-            await Promise.all([loadProperties(session.token, filters), loadActivity(session.token)]);
-          }}
-        />
-      ) : null}
-
-      {activeTab === "create" && createMode === "full" ? (
+      {activeTab === "create" ? (
         <LandsoftFormScreen
           token={session.token}
           lookups={lookups}
           draft={draft}
           savingDraft={savingDraft}
+          existingPhones={properties.map((p) => p.contact_phone ?? "").filter(Boolean)}
           onChangeDraft={updateDraft}
-          onBack={() => setCreateMode("quick")}
           onSubmitSuccess={async () => {
-            setCreateMode("quick");
             setActiveTab("properties");
             await Promise.all([loadProperties(session.token, filters), loadActivity(session.token)]);
           }}
@@ -517,13 +515,15 @@ export default function App() {
         />
       ) : null}
 
-      <TabBar
-        activeTab={activeTab}
-        onChange={(tab) => {
-          setSelectedPropertyId(null);
-          setActiveTab(tab);
-        }}
-      />
+      {!isPropertyDetailView ? (
+        <LandsoftNavBar
+          activeTab={activeTab}
+          onChange={(tab) => {
+            setSelectedPropertyId(null);
+            setActiveTab(tab);
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
