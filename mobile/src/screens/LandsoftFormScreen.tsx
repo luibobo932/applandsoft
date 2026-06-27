@@ -57,14 +57,6 @@ function CheckRow({
   );
 }
 
-// Chuan hoa SDT de so sanh trung (bo ky tu khong phai so, +84 -> 0)
-function normalizePhone(raw?: string | null): string {
-  let s = (raw ?? "").replace(/[^\d+]/g, "");
-  if (s.startsWith("+84")) s = "0" + s.slice(3);
-  else if (s.startsWith("84") && s.length >= 11) s = "0" + s.slice(2);
-  return s;
-}
-
 // Quy doi gia (ty) -> "X tỷ Y triệu" giong Landsoft "{0:0.#}"
 function formatGiaQuyDoi(priceTy?: number): string {
   if (!priceTy || priceTy <= 0) return "";
@@ -81,7 +73,6 @@ export function LandsoftFormScreen({
   lookups,
   draft,
   savingDraft,
-  existingPhones = [],
   onChangeDraft,
   onSubmitSuccess,
 }: {
@@ -89,7 +80,6 @@ export function LandsoftFormScreen({
   lookups: LookupCollections;
   draft: PropertyCreatePayload;
   savingDraft: boolean;
-  existingPhones?: string[];
   onChangeDraft: (patch: Partial<PropertyCreatePayload>) => void;
   onSubmitSuccess: () => Promise<void>;
 }) {
@@ -99,39 +89,34 @@ export function LandsoftFormScreen({
     (item) => !draft.district_code || item.parent_code === draft.district_code
   );
 
-  // Kiem tra SDT trung (giong Landsoft: o do len).
-  // So sanh GIU ky tu dac biet -> them "." hoac ky tu la -> coi nhu so khac -> het do.
-  const phoneRaw = draft.contact_phone ?? "";
-  const phoneDigits = normalizePhone(phoneRaw); // chi de dem do dai + trigger
-  const enteredCmp = cleanPhoneCompare(phoneRaw);
-  const phoneDupLocal =
-    phoneDigits.length >= 9 &&
-    existingPhones.some((p) => cleanPhoneCompare(p) === enteredCmp);
-
-  // Check trung TOAN BO kho qua backend (debounce 600ms). Re-run khi RAW thay doi.
-  const [phoneDupServer, setPhoneDupServer] = useState(0);
+  // SDT trung -> o do (giong Landsoft "Số di động đã có trong hệ thống").
+  // Chi check khi SDT TRON (chua them ky tu la). Them "." hoac ky tu dac biet
+  // -> coi nhu so khac -> het do, de co y bo qua canh bao.
+  const phoneClean = cleanPhoneCompare(draft.contact_phone); // bo khoang trang + +84->0
+  const isPlainPhone = /^0\d{8,10}$/.test(phoneClean);
+  const [phoneDupCount, setPhoneDupCount] = useState(0);
   useEffect(() => {
-    if (phoneDigits.length < 9) {
-      setPhoneDupServer(0);
+    if (!isPlainPhone) {
+      setPhoneDupCount(0);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(() => {
-      checkPhoneExists(token, phoneRaw)
+      checkPhoneExists(token, phoneClean)
         .then((count) => {
-          if (!cancelled) setPhoneDupServer(count);
+          if (!cancelled) setPhoneDupCount(count);
         })
         .catch(() => {
-          if (!cancelled) setPhoneDupServer(0);
+          if (!cancelled) setPhoneDupCount(0);
         });
-    }, 600);
+    }, 500);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [phoneRaw, phoneDigits, token]);
+  }, [phoneClean, isPlainPhone, token]);
 
-  const phoneDup = phoneDupLocal || phoneDupServer > 0;
+  const phoneDup = isPlainPhone && phoneDupCount > 0;
   const giaQuyDoi = formatGiaQuyDoi(draft.price);
 
   const validate = (): string | null => {
@@ -354,11 +339,7 @@ export function LandsoftFormScreen({
             placeholder="0911.380.022"
           />
           {phoneDup ? (
-            <Text style={styles.lsPhoneDupWarn}>
-              {phoneDupServer > 0
-                ? `⚠ SĐT đã có ${phoneDupServer} tin trong hệ thống`
-                : "⚠ SĐT đã có trong hệ thống"}
-            </Text>
+            <Text style={styles.lsPhoneDupWarn}>⚠ Số di động đã có trong hệ thống</Text>
           ) : null}
         </Field>
       </Section>

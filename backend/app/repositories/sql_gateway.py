@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import re
 from typing import Any
 
 from app.core.landsoft_crypto import decrypt_landsoft_password
@@ -9,6 +10,11 @@ from app.repositories.gateway import AuthenticatedUser
 
 
 class SqlLandsoftGateway:
+    _ADDRESS_KEYWORD_PATTERN = re.compile(
+        r"^\s*(?P<house>\d[\w./-]*)[\s,]+(?P<street>.+?)\s*$",
+        re.UNICODE,
+    )
+
     LIST_BASE_SQL = """
         FROM dbo.mglbcBanChoThue bc
         LEFT JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
@@ -131,19 +137,30 @@ class SqlLandsoftGateway:
 
         keyword = (filters.get("keyword") or "").strip()
         if keyword:
-            like = f"%{keyword}%"
-            clauses.append(
-                """
-                AND (
-                    bc.SoDK LIKE ? OR bc.KyHieu LIKE ? OR bc.TieuDe LIKE ? OR
-                    CAST(bc.NoiDung AS nvarchar(max)) LIKE ? OR bc.DienGiai LIKE ? OR
-                    bc.SoNha LIKE ? OR s.Names LIKE ? OR
-                    (COALESCE(kh.HoKH, N'') + N' ' + COALESCE(kh.TenKH, N'')) LIKE ? OR
-                    kh.DiDong LIKE ?
+            exact_address = self._parse_exact_address_keyword(keyword)
+            if exact_address:
+                house_number, street_name = exact_address
+                clauses.append(
+                    """
+                    AND LTRIM(RTRIM(COALESCE(bc.SoNha, N''))) = ?
+                    AND LTRIM(RTRIM(COALESCE(s.Names, N''))) LIKE ?
+                    """
                 )
-                """
-            )
-            params.extend([like] * 9)
+                params.extend([house_number, f"%{street_name}%"])
+            else:
+                like = f"%{keyword}%"
+                clauses.append(
+                    """
+                    AND (
+                        bc.SoDK LIKE ? OR bc.KyHieu LIKE ? OR bc.TieuDe LIKE ? OR
+                        CAST(bc.NoiDung AS nvarchar(max)) LIKE ? OR bc.DienGiai LIKE ? OR
+                        bc.SoNha LIKE ? OR s.Names LIKE ? OR
+                        (COALESCE(kh.HoKH, N'') + N' ' + COALESCE(kh.TenKH, N'')) LIKE ? OR
+                        kh.DiDong LIKE ?
+                    )
+                    """
+                )
+                params.extend([like] * 9)
 
         # Quan: ho tro chon nhieu (uu tien nhieu khu vuc) qua 'districts' (CSV), van giu 'district' don le
         districts_raw = (filters.get("districts") or "").strip()
@@ -208,6 +225,20 @@ class SqlLandsoftGateway:
 
         return "\n".join(clauses), params
 
+    @classmethod
+    def _parse_exact_address_keyword(cls, keyword: str) -> tuple[str, str] | None:
+        """Nhận diện từ khóa dạng 'số nhà + tên đường' để tìm đồng thời hai trường."""
+        match = cls._ADDRESS_KEYWORD_PATTERN.match(keyword)
+        if not match:
+            return None
+
+        house_number = match.group("house").strip()
+        street_name = match.group("street").strip(" ,")
+        street_name = re.sub(r"^(?:đường|duong)\s+", "", street_name, flags=re.IGNORECASE)
+        if not street_name or not any(character.isalpha() for character in street_name):
+            return None
+        return house_number, street_name
+
     def _fetch_first_result(self, cursor):
         while True:
             if cursor.description is not None:
@@ -252,6 +283,27 @@ class SqlLandsoftGateway:
         if billions > 0:
             return f"{billions} tỷ"
         return f"{millions} triệu"
+
+    def count_owner_by_phone(self, phone: str) -> int:
+        """Dem so khach hang (chu nha) co SDT trung KHOP CHINH XAC (sau khi bo separator).
+        Giong check 'Số di động đã có trong hệ thống' cua Landsoft."""
+        digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+        if len(digits) < 9:
+            return 0
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM dbo.KhachHang
+                WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                        LTRIM(RTRIM(COALESCE(DiDong, N''))),
+                        N' ', N''), N'.', N''), N'-', N''), N'(', N''), N')', N'') = ?
+                """,
+                digits,
+            )
+            row = cursor.fetchone()
+            return int(row[0]) if row and row[0] is not None else 0
 
     def _resolve_ward(self, ward_code: str, district_code: str) -> dict[str, Any]:
         with open_sql_connection() as conn:

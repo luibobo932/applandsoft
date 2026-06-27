@@ -31,6 +31,8 @@ class LandsoftGateway(Protocol):
 
     def create_property(self, payload: dict, actor: AuthenticatedUser) -> dict: ...
 
+    def count_owner_by_phone(self, phone: str) -> int: ...
+
 
 @lru_cache
 def get_gateway() -> LandsoftGateway:

@@ -58,6 +58,14 @@ def list_properties(
     return PagedPropertiesResponse(items=items, page=page, page_size=page_size, total=total)
 
 
+@router.get("/properties/check-phone")
+def check_phone(phone: str, _user=Depends(current_user)) -> dict:
+    """Check SDT chu nha da ton tai trong he thong (khop chinh xac cot KhachHang.DiDong).
+    Giong Landsoft 'Số di động đã có trong hệ thống'."""
+    count = get_gateway().count_owner_by_phone(phone)
+    return {"exists": count > 0, "count": count}
+
+
 @router.get("/properties/{landsoft_id}", response_model=PropertyDetail)
 def get_property(landsoft_id: int, _user=Depends(current_user)) -> PropertyDetail:
     return PropertyDetail(**property_or_404(landsoft_id))

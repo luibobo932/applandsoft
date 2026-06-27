@@ -220,18 +220,17 @@ export function cleanPhoneCompare(raw?: string | null): string {
   return s;
 }
 
-// Kiem tra SDT da ton tai trong TOAN BO kho (qua backend, keyword search co match kh.DiDong).
-// Chi tinh trung khi NHAP DUNG Y CHANG so da luu (them ky tu dac biet -> coi nhu so khac).
+// Kiem tra SDT chu nha da ton tai trong he thong — khop CHINH XAC cot KhachHang.DiDong
+// (giong Landsoft "Số di động đã có trong hệ thống"). Tra ve so khach hang trung.
 export async function checkPhoneExists(token: string, phone: string): Promise<number> {
   const digits = normalizePhoneDigits(phone);
   if (digits.length < 9) return 0;
-  const entered = cleanPhoneCompare(phone);
-  const res = await request<PagedPropertiesResponse>(
-    `/properties?keyword=${encodeURIComponent(digits)}&page=1&page_size=50`,
+  const res = await request<{ exists: boolean; count: number }>(
+    `/properties/check-phone?phone=${encodeURIComponent(digits)}`,
     {},
     token
   );
-  return res.items.filter((it) => cleanPhoneCompare(it.contact_phone) === entered).length;
+  return res.count ?? 0;
 }
 
 export async function createProperty(

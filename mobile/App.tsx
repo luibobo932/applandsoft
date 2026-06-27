@@ -497,7 +497,6 @@ export default function App() {
           lookups={lookups}
           draft={draft}
           savingDraft={savingDraft}
-          existingPhones={properties.map((p) => p.contact_phone ?? "").filter(Boolean)}
           onChangeDraft={updateDraft}
           onSubmitSuccess={async () => {
             setActiveTab("properties");
