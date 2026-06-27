@@ -203,7 +203,7 @@ export async function addPropertyNote(
   );
 }
 
-// Chuan hoa SDT ve dang 0xxxxxxxxx de so sanh trung
+// Chi giu CHU SO (de search backend va dem do dai SDT)
 function normalizePhoneDigits(raw?: string | null): string {
   let s = (raw ?? "").replace(/[^\d+]/g, "");
   if (s.startsWith("+84")) s = "0" + s.slice(3);
@@ -211,16 +211,27 @@ function normalizePhoneDigits(raw?: string | null): string {
   return s.replace(/[^\d]/g, "");
 }
 
-// Kiem tra SDT da ton tai trong TOAN BO kho (qua backend, keyword search co match kh.DiDong)
+// So sanh trung: GIU ky tu dac biet (chi bo khoang trang + quy +84 -> 0).
+// Nho vay nguoi dung co the them ky tu (vi du "0938. ") de co y bo qua canh bao trung.
+export function cleanPhoneCompare(raw?: string | null): string {
+  let s = (raw ?? "").trim().replace(/\s+/g, "");
+  if (s.startsWith("+84")) s = "0" + s.slice(3);
+  else if (s.startsWith("84") && /^\d+$/.test(s) && s.length >= 11) s = "0" + s.slice(2);
+  return s;
+}
+
+// Kiem tra SDT da ton tai trong TOAN BO kho (qua backend, keyword search co match kh.DiDong).
+// Chi tinh trung khi NHAP DUNG Y CHANG so da luu (them ky tu dac biet -> coi nhu so khac).
 export async function checkPhoneExists(token: string, phone: string): Promise<number> {
   const digits = normalizePhoneDigits(phone);
   if (digits.length < 9) return 0;
+  const entered = cleanPhoneCompare(phone);
   const res = await request<PagedPropertiesResponse>(
     `/properties?keyword=${encodeURIComponent(digits)}&page=1&page_size=50`,
     {},
     token
   );
-  return res.items.filter((it) => normalizePhoneDigits(it.contact_phone) === digits).length;
+  return res.items.filter((it) => cleanPhoneCompare(it.contact_phone) === entered).length;
 }
 
 export async function createProperty(

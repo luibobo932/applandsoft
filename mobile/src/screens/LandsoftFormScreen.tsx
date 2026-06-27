@@ -6,7 +6,7 @@ import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-nativ
 import { Field, Section, SelectField } from "../components/shared";
 import { styles } from "../styles";
 import { normalizeApiError, parseNumberInput } from "../utils";
-import { checkPhoneExists, createProperty } from "../api";
+import { checkPhoneExists, cleanPhoneCompare, createProperty } from "../api";
 import { LookupCollections, PropertyCreatePayload } from "../types";
 
 const CREATE_DRAFT_KEY = "landsoft_mobile_create_draft";
@@ -99,22 +99,25 @@ export function LandsoftFormScreen({
     (item) => !draft.district_code || item.parent_code === draft.district_code
   );
 
-  // Kiem tra SDT trung (giong Landsoft: o do len)
-  const phoneNorm = normalizePhone(draft.contact_phone);
+  // Kiem tra SDT trung (giong Landsoft: o do len).
+  // So sanh GIU ky tu dac biet -> them "." hoac ky tu la -> coi nhu so khac -> het do.
+  const phoneRaw = draft.contact_phone ?? "";
+  const phoneDigits = normalizePhone(phoneRaw); // chi de dem do dai + trigger
+  const enteredCmp = cleanPhoneCompare(phoneRaw);
   const phoneDupLocal =
-    phoneNorm.length >= 9 &&
-    existingPhones.some((p) => normalizePhone(p) === phoneNorm);
+    phoneDigits.length >= 9 &&
+    existingPhones.some((p) => cleanPhoneCompare(p) === enteredCmp);
 
-  // Check trung TOAN BO kho qua backend (debounce 600ms)
+  // Check trung TOAN BO kho qua backend (debounce 600ms). Re-run khi RAW thay doi.
   const [phoneDupServer, setPhoneDupServer] = useState(0);
   useEffect(() => {
-    if (phoneNorm.length < 9) {
+    if (phoneDigits.length < 9) {
       setPhoneDupServer(0);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(() => {
-      checkPhoneExists(token, phoneNorm)
+      checkPhoneExists(token, phoneRaw)
         .then((count) => {
           if (!cancelled) setPhoneDupServer(count);
         })
@@ -126,7 +129,7 @@ export function LandsoftFormScreen({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [phoneNorm, token]);
+  }, [phoneRaw, phoneDigits, token]);
 
   const phoneDup = phoneDupLocal || phoneDupServer > 0;
   const giaQuyDoi = formatGiaQuyDoi(draft.price);
