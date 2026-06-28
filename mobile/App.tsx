@@ -284,6 +284,23 @@ export default function App() {
     loadedCountRef.current = properties.length;
   }, [properties.length]);
 
+  // LIVE SEARCH theo SDT chu nha: go du >=4 so -> tu hien ket qua o duoi (debounce 450ms),
+  // khong can bam nut tim. Xoa het -> tro ve danh sach day du.
+  const prevPhoneRef = useRef<string>("");
+  useEffect(() => {
+    if (!session) return;
+    const digits = (filters.phone ?? "").replace(/\D/g, "");
+    const prev = prevPhoneRef.current;
+    prevPhoneRef.current = filters.phone ?? "";
+    const shouldSearch = digits.length >= 4 || (digits.length === 0 && prev !== "");
+    if (!shouldSearch) return;
+    const timer = setTimeout(() => {
+      void loadProperties(session.token, { ...filters, page: 1 });
+    }, 450);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.phone, session, loadProperties]);
+
   // Cuon toi dau tai toi do: lay trang ke tiep va noi vao danh sach
   const handleLoadMore = useCallback(async () => {
     if (!session || loadingMore || propertyLoading) {

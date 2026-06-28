@@ -49,6 +49,7 @@ class PropertyDetail(PropertySummary):
 
 class PropertyFilters(BaseModel):
     keyword: str | None = None
+    phone: str | None = None
     district: str | None = None
     districts: str | None = None
     ward: str | None = None

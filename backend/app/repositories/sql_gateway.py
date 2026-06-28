@@ -180,6 +180,18 @@ class SqlLandsoftGateway:
             clauses.append("AND s.Names LIKE ?")
             params.append(f"%{street}%")
 
+        # Tim theo SDT chu nha (khop cot KhachHang.DiDong, bo separator de khop ca so luu dang "0932..")
+        phone_digits = "".join(ch for ch in (filters.get("phone") or "") if ch.isdigit())
+        if len(phone_digits) >= 4:
+            clauses.append(
+                """
+                AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                    LTRIM(RTRIM(COALESCE(kh.DiDong, N''))),
+                    N' ', N''), N'.', N''), N'-', N''), N'(', N''), N')', N'') LIKE ?
+                """
+            )
+            params.append(f"%{phone_digits}%")
+
         if filters.get("width_min") is not None:
             clauses.append("AND bc.NgangKV >= ?")
             params.append(float(filters["width_min"]))

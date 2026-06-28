@@ -83,6 +83,7 @@ export type PropertyDetail = PropertySummary & {
 
 export type PropertyFilters = {
   keyword?: string;
+  phone?: string; // tim theo SDT chu nha
   district?: string;
   districts?: string; // nhieu quan, ngan cach dau phay
   ward?: string;

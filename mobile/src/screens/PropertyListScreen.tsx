@@ -105,6 +105,7 @@ export function PropertyListScreen({
   const resetFilters = useCallback(() => {
     onChangeFilter({
       keyword: "",
+      phone: "",
       district: "",
       districts: "",
       ward: "",
@@ -168,7 +169,7 @@ export function PropertyListScreen({
   const overviewHint =
     activeFilterCount > 0
       ? activeFilterChips.join(" • ")
-      : `Tổng kho ${formatCount(totalCount)} căn trong Landsoft. Tìm nhanh theo tên, mô tả, địa chỉ hoặc mở bộ lọc nâng cao.`;
+      : `Tổng kho ${formatCount(totalCount)} căn trong HomeApp. Tìm nhanh theo tên, mô tả, địa chỉ hoặc mở bộ lọc nâng cao.`;
 
   // "Đang bán" = Mở bán, "Đã bán" = Đã giao dịch — tìm theo nhãn trạng thái của Landsoft
   const findStatusCode = (...keywords: string[]) =>
@@ -248,12 +249,30 @@ export function PropertyListScreen({
                     style={styles.searchInput}
                     value={filters.keyword ?? ""}
                     onChangeText={(value) => onChangeFilter({ keyword: value })}
-                    placeholder="Tìm theo tên, mô tả, địa chỉ, quận..."
+                    placeholder="Nhập số nhà + tên đường, VD: 5A/1 Mai Hắc Đế"
+                    returnKeyType="search"
+                    onSubmitEditing={() => void onReload()}
                   />
                 </View>
                 <Pressable style={styles.searchToolbarIconButton} onPress={() => setShowFilters((current) => !current)}>
                   <Feather name={showFilters ? "chevron-up" : "sliders"} size={18} color="#17305D" />
                 </Pressable>
+              </View>
+              {/* Tim theo SDT chu nha — LIVE: go du so la tu hien ket qua o duoi */}
+              <View style={styles.phoneSearchWrap}>
+                <Feather name="phone" size={17} color="#15428B" />
+                <TextInput
+                  style={styles.searchInput}
+                  value={filters.phone ?? ""}
+                  onChangeText={(value) => onChangeFilter({ phone: value })}
+                  placeholder="Tìm theo SĐT chủ nhà — tự hiện khi gõ đủ số"
+                  keyboardType="phone-pad"
+                />
+                {filters.phone?.trim() ? (
+                  <Pressable onPress={() => onChangeFilter({ phone: "" })} hitSlop={8}>
+                    <Feather name="x-circle" size={17} color="#94A3B8" />
+                  </Pressable>
+                ) : null}
               </View>
               <View style={styles.toolbarPillRow}>
                 <Pressable style={styles.primaryButtonCompactWide} onPress={() => void onReload()}>

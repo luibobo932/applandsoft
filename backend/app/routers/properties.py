@@ -19,6 +19,7 @@ router = APIRouter(tags=["properties"])
 @router.get("/properties", response_model=PagedPropertiesResponse)
 def list_properties(
     keyword: str | None = None,
+    phone: str | None = None,
     district: str | None = None,
     districts: str | None = None,
     ward: str | None = None,
@@ -38,6 +39,7 @@ def list_properties(
 ) -> PagedPropertiesResponse:
     filters = PropertyFilters(
         keyword=keyword,
+        phone=phone,
         district=district,
         districts=districts,
         ward=ward,
