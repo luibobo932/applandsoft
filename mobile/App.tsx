@@ -129,7 +129,7 @@ export default function App() {
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [filters, setFilters] = useState<PropertyFilters>(emptyFilters);
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<LandsoftView>("workspace");
+  const [activeTab, setActiveTab] = useState<LandsoftView>("properties");
   const [propertyLoading, setPropertyLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
