@@ -61,9 +61,15 @@ def list_properties(
 @router.get("/properties/check-phone")
 def check_phone(phone: str, _user=Depends(current_user)) -> dict:
     """Check SDT chu nha da ton tai trong he thong (khop chinh xac cot KhachHang.DiDong).
-    Giong Landsoft 'Số di động đã có trong hệ thống'."""
-    count = get_gateway().count_owner_by_phone(phone)
-    return {"exists": count > 0, "count": count}
+    Giong Landsoft 'Số di động đã có trong hệ thống'. Tra ve them ten chu nha."""
+    result = get_gateway().find_owner_by_phone(phone)
+    return {"exists": result["count"] > 0, "count": result["count"], "owner_name": result.get("owner_name")}
+
+
+@router.get("/streets")
+def list_streets(district: str, keyword: str | None = None, _user=Depends(current_user)) -> list[dict]:
+    """Danh sach ten duong theo quan — cho dropdown 'Tên đường' (giong Landsoft)."""
+    return get_gateway().list_streets(district, keyword)
 
 
 @router.get("/properties/{landsoft_id}", response_model=PropertyDetail)

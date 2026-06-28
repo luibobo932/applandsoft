@@ -221,16 +221,30 @@ export function cleanPhoneCompare(raw?: string | null): string {
 }
 
 // Kiem tra SDT chu nha da ton tai trong he thong — khop CHINH XAC cot KhachHang.DiDong
-// (giong Landsoft "Số di động đã có trong hệ thống"). Tra ve so khach hang trung.
-export async function checkPhoneExists(token: string, phone: string): Promise<number> {
+// (giong Landsoft "Số di động đã có trong hệ thống"). Tra ve so KH trung + ten chu nha.
+export async function checkPhone(
+  token: string,
+  phone: string
+): Promise<{ count: number; ownerName: string | null }> {
   const digits = normalizePhoneDigits(phone);
-  if (digits.length < 9) return 0;
-  const res = await request<{ exists: boolean; count: number }>(
+  if (digits.length < 9) return { count: 0, ownerName: null };
+  const res = await request<{ exists: boolean; count: number; owner_name: string | null }>(
     `/properties/check-phone?phone=${encodeURIComponent(digits)}`,
     {},
     token
   );
-  return res.count ?? 0;
+  return { count: res.count ?? 0, ownerName: res.owner_name ?? null };
+}
+
+// Danh sach ten duong theo quan (cho dropdown 'Tên đường' giong Landsoft lookUpDuong)
+export async function fetchStreets(token: string, districtCode: string): Promise<string[]> {
+  if (!districtCode) return [];
+  const res = await request<{ id: string; name: string }[]>(
+    `/streets?district=${encodeURIComponent(districtCode)}`,
+    {},
+    token
+  );
+  return res.map((s) => s.name).filter(Boolean);
 }
 
 export async function createProperty(

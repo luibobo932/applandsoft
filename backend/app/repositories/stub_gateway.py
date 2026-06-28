@@ -200,13 +200,18 @@ class StubLandsoftGateway:
                 return {"landsoft_id": landsoft_id, "message": "Đã thêm ghi chú", "note_id": note["note_id"]}
         raise KeyError(f"Property {landsoft_id} not found")
 
-    def count_owner_by_phone(self, phone: str) -> int:
+    def find_owner_by_phone(self, phone: str) -> dict:
         digits = "".join(ch for ch in (phone or "") if ch.isdigit())
         if len(digits) < 9:
-            return 0
+            return {"count": 0, "owner_name": None}
         def norm(value) -> str:
             return "".join(ch for ch in str(value or "") if ch.isdigit())
-        return sum(1 for item in self.properties if norm(item.get("contact_phone")) == digits)
+        matches = [item for item in self.properties if norm(item.get("contact_phone")) == digits]
+        name = next((m.get("owner_name") for m in matches if m.get("owner_name")), None)
+        return {"count": len(matches), "owner_name": name}
+
+    def list_streets(self, district_code: str, keyword: str | None = None) -> list[dict]:
+        return []
 
     def create_property(self, payload: dict, actor: AuthenticatedUser) -> dict:
         district_name = next((item["label"] for item in self.lookups["districts"] if item["code"] == payload["district_code"]), payload["district_code"])

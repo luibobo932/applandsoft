@@ -1,13 +1,24 @@
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { Field, Section, SelectField } from "../components/shared";
 import { styles } from "../styles";
 import { normalizeApiError, parseNumberInput } from "../utils";
-import { checkPhoneExists, cleanPhoneCompare, createProperty } from "../api";
+import { checkPhone, cleanPhoneCompare, createProperty, fetchStreets } from "../api";
 import { LookupCollections, PropertyCreatePayload } from "../types";
+
+// Bo dau tieng Viet de loc khong phan biet dau
+function stripAccents(s: string): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
 
 const CREATE_DRAFT_KEY = "landsoft_mobile_create_draft";
 
@@ -89,25 +100,33 @@ export function LandsoftFormScreen({
     (item) => !draft.district_code || item.parent_code === draft.district_code
   );
 
-  // SDT trung -> o do (giong Landsoft "Số di động đã có trong hệ thống").
+  // SDT trung -> o do + hien ten chu nha (giong Landsoft "Tìm" + "Số di động đã có trong hệ thống").
   // Chi check khi SDT TRON (chua them ky tu la). Them "." hoac ky tu dac biet
   // -> coi nhu so khac -> het do, de co y bo qua canh bao.
   const phoneClean = cleanPhoneCompare(draft.contact_phone); // bo khoang trang + +84->0
   const isPlainPhone = /^0\d{8,10}$/.test(phoneClean);
-  const [phoneDupCount, setPhoneDupCount] = useState(0);
+  const [phoneCheck, setPhoneCheck] = useState<{
+    checking: boolean;
+    count: number;
+    ownerName: string | null;
+    checkedPhone: string;
+  }>({ checking: false, count: 0, ownerName: null, checkedPhone: "" });
   useEffect(() => {
     if (!isPlainPhone) {
-      setPhoneDupCount(0);
+      setPhoneCheck({ checking: false, count: 0, ownerName: null, checkedPhone: "" });
       return;
     }
     let cancelled = false;
+    setPhoneCheck((prev) => ({ ...prev, checking: true }));
     const timer = setTimeout(() => {
-      checkPhoneExists(token, phoneClean)
-        .then((count) => {
-          if (!cancelled) setPhoneDupCount(count);
+      checkPhone(token, phoneClean)
+        .then((res) => {
+          if (!cancelled)
+            setPhoneCheck({ checking: false, count: res.count, ownerName: res.ownerName, checkedPhone: phoneClean });
         })
         .catch(() => {
-          if (!cancelled) setPhoneDupCount(0);
+          if (!cancelled)
+            setPhoneCheck({ checking: false, count: 0, ownerName: null, checkedPhone: phoneClean });
         });
     }, 500);
     return () => {
@@ -116,8 +135,38 @@ export function LandsoftFormScreen({
     };
   }, [phoneClean, isPlainPhone, token]);
 
-  const phoneDup = isPlainPhone && phoneDupCount > 0;
+  const phoneDup = isPlainPhone && phoneCheck.count > 0 && phoneCheck.checkedPhone === phoneClean;
+  const phoneChecked =
+    isPlainPhone && !phoneCheck.checking && phoneCheck.count === 0 && phoneCheck.checkedPhone === phoneClean;
   const giaQuyDoi = formatGiaQuyDoi(draft.price);
+
+  // Danh sach ten duong theo quan (dropdown 'Tên đường'), tai khi doi quan
+  const [streets, setStreets] = useState<string[]>([]);
+  const [streetFocused, setStreetFocused] = useState(false);
+  useEffect(() => {
+    if (!draft.district_code) {
+      setStreets([]);
+      return;
+    }
+    let cancelled = false;
+    fetchStreets(token, draft.district_code)
+      .then((list) => {
+        if (!cancelled) setStreets(list);
+      })
+      .catch(() => {
+        if (!cancelled) setStreets([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.district_code, token]);
+
+  const streetSuggestions = useMemo(() => {
+    const q = stripAccents(draft.street_name ?? "");
+    const pool = streets;
+    if (!q) return pool.slice(0, 8);
+    return pool.filter((name) => stripAccents(name).includes(q)).slice(0, 8);
+  }, [streets, draft.street_name]);
 
   const validate = (): string | null => {
     if (!draft.address?.trim()) return "Thiếu số nhà / địa chỉ";
@@ -239,8 +288,33 @@ export function LandsoftFormScreen({
             style={styles.input}
             value={draft.street_name ?? ""}
             onChangeText={(v) => onChangeDraft({ street_name: v })}
-            placeholder="VD: Nguyễn Trãi"
+            onFocus={() => setStreetFocused(true)}
+            onBlur={() => setTimeout(() => setStreetFocused(false), 200)}
+            placeholder={
+              draft.district_code ? "Gõ để tìm đường..." : "Chọn quận trước"
+            }
+            editable={!!draft.district_code}
           />
+          {streetFocused && streetSuggestions.length > 0 ? (
+            <View style={styles.lsStreetDropdown}>
+              {streetSuggestions.map((name) => (
+                <Pressable
+                  key={name}
+                  style={styles.lsStreetItem}
+                  onPress={() => {
+                    onChangeDraft({ street_name: name });
+                    setStreetFocused(false);
+                  }}
+                >
+                  <Feather name="map-pin" size={13} color="#6B7FA3" />
+                  <Text style={styles.lsStreetItemText}>{name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+          {draft.district_code && streets.length > 0 ? (
+            <Text style={styles.lsStreetHint}>{streets.length} đường trong quận</Text>
+          ) : null}
         </Field>
         <Field label="Số nhà / Địa chỉ">
           <TextInput
@@ -338,8 +412,28 @@ export function LandsoftFormScreen({
             onChangeText={(v) => onChangeDraft({ contact_phone: v })}
             placeholder="0911.380.022"
           />
-          {phoneDup ? (
-            <Text style={styles.lsPhoneDupWarn}>⚠ Số di động đã có trong hệ thống</Text>
+          {phoneCheck.checking ? (
+            <View style={styles.lsPhoneStatusRow}>
+              <ActivityIndicator size="small" color="#6B7FA3" />
+              <Text style={styles.lsPhoneChecking}>Đang kiểm tra số...</Text>
+            </View>
+          ) : phoneDup ? (
+            <View>
+              <Text style={styles.lsPhoneDupWarn}>⚠ Số di động đã có trong hệ thống</Text>
+              {phoneCheck.ownerName ? (
+                <Pressable
+                  onPress={() => onChangeDraft({ owner_name: phoneCheck.ownerName ?? "" })}
+                  style={styles.lsPhoneOwnerRow}
+                >
+                  <Feather name="user" size={13} color="#15428B" />
+                  <Text style={styles.lsPhoneOwner}>
+                    Chủ nhà: {phoneCheck.ownerName} — chạm để điền tên
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : phoneChecked ? (
+            <Text style={styles.lsPhoneOk}>✓ Số mới — chưa có trong hệ thống</Text>
           ) : null}
         </Field>
       </Section>

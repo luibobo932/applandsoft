@@ -284,26 +284,62 @@ class SqlLandsoftGateway:
             return f"{billions} tỷ"
         return f"{millions} triệu"
 
-    def count_owner_by_phone(self, phone: str) -> int:
-        """Dem so khach hang (chu nha) co SDT trung KHOP CHINH XAC (sau khi bo separator).
-        Giong check 'Số di động đã có trong hệ thống' cua Landsoft."""
+    def find_owner_by_phone(self, phone: str) -> dict:
+        """Tim khach hang (chu nha) co SDT trung KHOP CHINH XAC (sau khi bo separator).
+        Tra ve {count, owner_name} — giong check 'Số di động đã có trong hệ thống' cua Landsoft."""
         digits = "".join(ch for ch in (phone or "") if ch.isdigit())
         if len(digits) < 9:
-            return 0
+            return {"count": 0, "owner_name": None}
+        normalized = (
+            "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE("
+            "LTRIM(RTRIM(COALESCE(DiDong, N''))),"
+            "N' ', N''), N'.', N''), N'-', N''), N'(', N''), N')', N'')"
+        )
         with open_sql_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """
-                SELECT COUNT(*)
+                f"""
+                SELECT COUNT(*) AS cnt,
+                       MAX(LTRIM(RTRIM(COALESCE(HoKH, N'') + N' ' + COALESCE(TenKH, N'')))) AS owner_name
                 FROM dbo.KhachHang
-                WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                        LTRIM(RTRIM(COALESCE(DiDong, N''))),
-                        N' ', N''), N'.', N''), N'-', N''), N'(', N''), N')', N'') = ?
+                WHERE {normalized} = ?
                 """,
                 digits,
             )
             row = cursor.fetchone()
-            return int(row[0]) if row and row[0] is not None else 0
+            if not row or not row[0]:
+                return {"count": 0, "owner_name": None}
+            name = (row[1] or "").strip() or None
+            return {"count": int(row[0]), "owner_name": name}
+
+    def list_streets(self, district_code: str, keyword: str | None = None) -> list[dict]:
+        """Danh sach ten duong theo quan (cho dropdown 'Tên đường' giong Landsoft lookUpDuong)."""
+        code = (district_code or "").strip()
+        if not code.isdigit():
+            return []
+        kw = (keyword or "").strip()
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            if kw:
+                cursor.execute(
+                    """
+                    SELECT TOP 50 ID, Names FROM dbo.Street
+                    WHERE DistrictID = ? AND Names LIKE ?
+                    ORDER BY CASE WHEN Names LIKE ? THEN 0 ELSE 1 END, Names
+                    """,
+                    int(code), f"%{kw}%", f"{kw}%",
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT TOP 500 ID, Names FROM dbo.Street
+                    WHERE DistrictID = ? AND ISNULL(Names, N'') <> N''
+                    ORDER BY Names
+                    """,
+                    int(code),
+                )
+            rows = cursor.fetchall()
+            return [{"id": str(r[0]), "name": (r[1] or "").strip()} for r in rows if (r[1] or "").strip()]
 
     def _resolve_ward(self, ward_code: str, district_code: str) -> dict[str, Any]:
         with open_sql_connection() as conn:
