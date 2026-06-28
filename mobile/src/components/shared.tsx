@@ -6,7 +6,7 @@ import { styles } from "../styles";
 import { cleanDisplayText, getInitials } from "../utils";
 import { CurrentUser, LookupItem } from "../types";
 
-export type TabKey = "properties" | "create" | "activity";
+export type LandsoftView = "workspace" | "properties" | "create" | "activity";
 
 export function AppHeader({
   user,
@@ -20,7 +20,7 @@ export function AppHeader({
   return (
     <View style={styles.header}>
       <View style={styles.headerTextGroup}>
-        <Text style={styles.headerEyebrow}>{cleanDisplayText(user.role_name || "Landsoft Mobile")}</Text>
+        <Text style={styles.headerEyebrow}>{cleanDisplayText(user.role_name || "HomeApp")}</Text>
         <Text style={styles.headerTitle}>{title}</Text>
         <Text style={styles.headerSubtitle}>
           {cleanDisplayText(user.display_name)} • {cleanDisplayText(user.landsoft_username ?? user.username)}
@@ -45,16 +45,16 @@ export function AppHeader({
   );
 }
 
-export function TabBar({
+export function LandsoftNavBar({
   activeTab,
   onChange,
 }: {
-  activeTab: TabKey;
-  onChange: (tab: TabKey) => void;
+  activeTab: LandsoftView;
+  onChange: (tab: LandsoftView) => void;
 }) {
-  const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentProps<typeof Feather>["name"] }> = [
+  const tabs: Array<{ key: LandsoftView; label: string; icon: React.ComponentProps<typeof Feather>["name"] }> = [
+    { key: "workspace", label: "HomeApp", icon: "grid" },
     { key: "properties", label: "Kho hàng", icon: "home" },
-    { key: "create", label: "Nhập nhà", icon: "plus-circle" },
     { key: "activity", label: "Gần đây", icon: "clock" },
   ];
 

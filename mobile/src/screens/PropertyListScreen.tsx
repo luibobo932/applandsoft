@@ -85,7 +85,6 @@ export function PropertyListScreen({
   onLoadMore,
   onOpenProperty,
   onQuickViewPhone,
-  onGoCreate,
 }: {
   filters: PropertyFilters;
   items: PropertySummary[];
@@ -99,7 +98,6 @@ export function PropertyListScreen({
   onLoadMore: () => void;
   onOpenProperty: (landsoftId: number) => void;
   onQuickViewPhone: (landsoftId: number) => Promise<void>;
-  onGoCreate: () => void;
 }) {
   const [showFilters, setShowFilters] = useState(false);
   const resetFilters = useCallback(() => {
@@ -227,10 +225,6 @@ export function PropertyListScreen({
                       size={18}
                       color={showFilters ? "#ffffff" : "#17305D"}
                     />
-                  </Pressable>
-                  <Pressable style={styles.marketOverviewAddButton} onPress={onGoCreate}>
-                    <Feather name="plus" size={16} color="#ffffff" />
-                    <Text style={styles.marketOverviewAddButtonText}>Thêm nhà</Text>
                   </Pressable>
                 </View>
               </View>
@@ -660,10 +654,6 @@ export function PropertyListScreen({
           );
         }}
       />
-      <Pressable style={styles.createFab} onPress={onGoCreate}>
-        <Feather name="plus" size={20} color="#ffffff" />
-        <Text style={styles.createFabText}>Nhập nhà</Text>
-      </Pressable>
     </View>
   );
 }

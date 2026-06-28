@@ -19,7 +19,6 @@ import { AppHeader, LandsoftNavBar, LandsoftView } from "./src/components/shared
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { PropertyListScreen } from "./src/screens/PropertyListScreen";
 import { PropertyDetailScreen } from "./src/screens/PropertyDetailScreen";
-import { LandsoftFormScreen } from "./src/screens/LandsoftFormScreen";
 import { ActivityScreen } from "./src/screens/ActivityScreen";
 import { LandsoftWorkspaceScreen } from "./src/screens/LandsoftWorkspaceScreen";
 import { styles } from "./src/styles";
@@ -159,9 +158,6 @@ export default function App() {
     }
     if (selectedPropertyId && activeTab === "properties") {
       return "Chi tiết căn";
-    }
-    if (activeTab === "create") {
-      return "Nhập nhà mới";
     }
     if (activeTab === "activity") {
       return "Lịch sử";
@@ -504,21 +500,6 @@ export default function App() {
           onLoadMore={handleLoadMore}
           onOpenProperty={(landsoftId) => setSelectedPropertyId(landsoftId)}
           onQuickViewPhone={handleQuickViewPhone}
-          onGoCreate={() => setActiveTab("create")}
-        />
-      ) : null}
-
-      {activeTab === "create" ? (
-        <LandsoftFormScreen
-          token={session.token}
-          lookups={lookups}
-          draft={draft}
-          savingDraft={savingDraft}
-          onChangeDraft={updateDraft}
-          onSubmitSuccess={async () => {
-            setActiveTab("properties");
-            await Promise.all([loadProperties(session.token, filters), loadActivity(session.token)]);
-          }}
         />
       ) : null}
 
