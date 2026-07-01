@@ -29,9 +29,9 @@ export function LoginScreen({
     <SafeAreaView style={styles.loginScreen}>
       <StatusBar style="dark" />
       <View style={styles.loginPanel}>
-        <Text style={styles.loginTitle}>Landsoft Mobile</Text>
+        <Text style={styles.loginTitle}>HomeApp</Text>
         <Text style={styles.loginDescription}>
-          App Android riêng để xem kho nhà và nhập nhà mới trực tiếp vào Landsoft qua backend cloud.
+          App Android để xem kho nhà và nhập nhà mới trực tiếp qua hệ thống cloud.
         </Text>
         {showApiSettings ? <Field label="API backend">
           <TextInput

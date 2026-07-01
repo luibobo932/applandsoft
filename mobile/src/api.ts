@@ -2,10 +2,12 @@ import { getApiBaseUrl } from "./config";
 import {
   ActionResponse,
   ActivityItem,
+  CallLogEmployee,
   CurrentUser,
   LoginPayload,
   LoginResponse,
   LookupCollections,
+  PagedCallLogsResponse,
   PagedPropertiesResponse,
   PropertyCreatePayload,
   PropertyDetail,
@@ -263,4 +265,36 @@ export async function createProperty(
 
 export async function fetchActivity(token: string): Promise<ActivityItem[]> {
   return request<ActivityItem[]>("/activity/recent", {}, token);
+}
+
+export async function fetchCallLogEmployees(token: string, keyword = ""): Promise<CallLogEmployee[]> {
+  const query = keyword.trim() ? `?keyword=${encodeURIComponent(keyword.trim())}` : "";
+  return request<CallLogEmployee[]>(`/call-logs/employees${query}`, {}, token);
+}
+
+export async function fetchCallLogs(
+  token: string,
+  params: {
+    employeeIds?: number[];
+    fromDate?: string;
+    toDate?: string;
+    afterId?: number | null;
+    limit?: number;
+  }
+): Promise<PagedCallLogsResponse> {
+  const query = new URLSearchParams();
+  if (params.employeeIds?.length) {
+    query.set("employee_ids", params.employeeIds.join(","));
+  }
+  if (params.fromDate) {
+    query.set("from_date", params.fromDate);
+  }
+  if (params.toDate) {
+    query.set("to_date", params.toDate);
+  }
+  if (params.afterId) {
+    query.set("after_id", String(params.afterId));
+  }
+  query.set("limit", String(params.limit ?? 100));
+  return request<PagedCallLogsResponse>(`/call-logs?${query.toString()}`, {}, token);
 }

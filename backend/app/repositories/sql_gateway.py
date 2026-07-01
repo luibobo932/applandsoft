@@ -466,6 +466,126 @@ class SqlLandsoftGateway:
                     payload[key] = []
             return payload
 
+    def list_call_log_employees(self, keyword: str | None = None, limit: int = 300) -> list[dict]:
+        search = (keyword or "").strip()
+        params: list[Any] = []
+        keyword_clause = ""
+        if search:
+            keyword_clause = "AND (nv.MaSo LIKE ? OR nv.HoTen LIKE ?)"
+            like = f"%{search}%"
+            params.extend([like, like])
+
+        sql = f"""
+            SELECT TOP ({int(limit)})
+                nv.MaNV AS employee_id,
+                nv.MaSo AS employee_code,
+                LTRIM(RTRIM(nv.HoTen)) AS employee_name,
+                COALESCE(today_logs.today_call_count, 0) AS today_call_count,
+                today_logs.latest_call_at
+            FROM dbo.NhanVien nv
+            OUTER APPLY (
+                SELECT
+                    COUNT(*) AS today_call_count,
+                    MAX(x.NgayXem) AS latest_call_at
+                FROM dbo.mglNhanVienXem x
+                WHERE x.MaNV = nv.MaNV
+                  AND x.LoaiDV = 1
+                  AND x.NgayXem >= CONVERT(date, GETDATE())
+                  AND x.NgayXem < DATEADD(day, 1, CONVERT(date, GETDATE()))
+            ) today_logs
+            WHERE nv.MaSo IS NOT NULL
+              AND LTRIM(RTRIM(nv.MaSo)) <> N''
+              AND nv.HoTen IS NOT NULL
+              AND LTRIM(RTRIM(nv.HoTen)) <> N''
+              {keyword_clause}
+            ORDER BY
+              COALESCE(today_logs.today_call_count, 0) DESC,
+              LTRIM(RTRIM(nv.HoTen)) ASC,
+              nv.MaNV ASC
+        """
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            return self._fetch_all_dicts(cursor)
+
+    def list_call_logs(
+        self,
+        employee_ids: list[int],
+        start,
+        end,
+        after_id: int | None = None,
+        limit: int = 100,
+    ) -> dict:
+        clauses = [
+            "x.LoaiDV = 1",
+            "x.NgayXem >= ?",
+            "x.NgayXem <= ?",
+        ]
+        params: list[Any] = [start, end]
+
+        if employee_ids:
+            placeholders = ",".join("?" for _ in employee_ids)
+            clauses.append(f"x.MaNV IN ({placeholders})")
+            params.extend(employee_ids)
+
+        if after_id is not None:
+            clauses.append("x.ID > ?")
+            params.append(after_id)
+
+        where_clause = " AND ".join(clauses)
+        select_sql = f"""
+            SELECT TOP ({max(min(int(limit), 500), 1)})
+                x.ID AS log_id,
+                x.NgayXem AS called_at,
+                nv.MaNV AS employee_id,
+                nv.MaSo AS employee_code,
+                LTRIM(RTRIM(nv.HoTen)) AS employee_name,
+                bc.MaBC AS landsoft_id,
+                bc.SoNha AS house_number,
+                s.Names AS street_name,
+                h.TenHuyen AS district_name,
+                LTRIM(RTRIM(
+                    COALESCE(bc.SoNha, N'')
+                    + CASE WHEN ISNULL(bc.SoNha, N'') <> N'' AND ISNULL(s.Names, N'') <> N'' THEN N' ' ELSE N'' END
+                    + COALESCE(s.Names, N'')
+                )) AS address,
+                CAST(COALESCE(NULLIF(bc.NgangKV, 0), NULLIF(bc.NgangXD, 0)) AS float) AS width,
+                CAST(COALESCE(NULLIF(bc.DaiKV, 0), NULLIF(bc.DaiXD, 0)) AS float) AS length,
+                CAST(COALESCE(NULLIF(bc.DienTich, 0), NULLIF(bc.DienTichKV, 0), NULLIF(bc.DienTichXD, 0)) AS float) AS area,
+                CAST(bc.ThanhTien / 1000000000.0 AS float) AS price,
+                COALESCE(
+                    NULLIF(LTRIM(RTRIM(bc.DienThoaiNDD)), N''),
+                    NULLIF(LTRIM(RTRIM(kh.DiDong)), N''),
+                    NULLIF(LTRIM(RTRIM(kh.DiDong2)), N''),
+                    NULLIF(LTRIM(RTRIM(kh.DienThoaiCT)), N'')
+                ) AS owner_phone,
+                bc.NgayDK AS created_at
+            FROM dbo.mglNhanVienXem x
+            JOIN dbo.NhanVien nv ON nv.MaNV = x.MaNV
+            JOIN dbo.mglbcBanChoThue bc ON bc.MaBC = x.KeyID
+            LEFT JOIN dbo.KhachHang kh ON kh.MaKH = bc.MaKH
+            LEFT JOIN dbo.Street s ON s.ID = bc.StreetID
+            LEFT JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
+            WHERE {where_clause}
+            ORDER BY x.ID DESC
+        """
+        count_sql = f"SELECT COUNT(*) FROM dbo.mglNhanVienXem x WHERE {where_clause}"
+
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(count_sql, params)
+            total = int(cursor.fetchone()[0])
+            cursor.execute(select_sql, params)
+            items = self._fetch_all_dicts(cursor)
+            latest_id = max((int(item["log_id"]) for item in items), default=after_id)
+            return {
+                "items": items,
+                "total": total,
+                "limit": limit,
+                "after_id": after_id,
+                "latest_id": latest_id,
+            }
+
     # Sap xep: whitelist cung de tranh SQL injection (khong noi chuoi nguoi dung vao ORDER BY)
     _AREA_EXPR = "COALESCE(NULLIF(bc.DienTich, 0), NULLIF(bc.DienTichKV, 0), NULLIF(bc.DienTichXD, 0))"
     SORT_OPTIONS = {

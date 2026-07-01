@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 
 from app.core.config import get_settings
 from app.db.sqlserver import check_sql_connection
-from app.routers import activity, auth, lookups, me, properties
+from app.routers import activity, auth, call_logs, lookups, me, properties
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +202,7 @@ def create_app() -> FastAPI:
     app.include_router(lookups.router, prefix=settings.api_prefix)
     app.include_router(properties.router, prefix=settings.api_prefix)
     app.include_router(activity.router, prefix=settings.api_prefix)
+    app.include_router(call_logs.router, prefix=settings.api_prefix)
     return app
 
 

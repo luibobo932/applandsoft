@@ -27,6 +27,7 @@ const moduleGroups: Array<{ title: string; items: ModuleItem[] }> = [
     title: "Khách hàng & công việc",
     items: [
       { key: "customers", label: "Khách hàng", description: "Danh bạ, lịch sử chăm sóc và nhu cầu", icon: "users" },
+      { key: "callLogs", label: "Theo dõi gọi SĐT", description: "Xem nhân viên đã gọi căn nào và bật báo theo người", icon: "phone-call", target: "callLogs" },
       { key: "activity", label: "Lịch sử thực hiện", description: "Các thao tác gần đây trên dữ liệu HomeApp", icon: "clock", target: "activity" },
       { key: "calendar", label: "Lịch làm việc", description: "Lịch hẹn, nhắc gọi và việc cần xử lý", icon: "calendar" },
       { key: "search-all", label: "Tìm kiếm tổng hợp", description: "Tìm xuyên suốt nhà, khách và giao dịch", icon: "crosshair" },

@@ -106,6 +106,9 @@ export function isAndroidEmulatorRuntime(): boolean {
   return (
     manufacturer.includes("genymotion") ||
     model.includes("android sdk built for") ||
+    model.includes("sdk_gphone") ||
+    fingerprint.includes("sdk_gphone") ||
+    fingerprint.includes("/emu") ||
     (brand === "generic" && fingerprint.includes("generic/sdk"))
   );
 }

@@ -35,6 +35,17 @@ class LandsoftGateway(Protocol):
 
     def list_streets(self, district_code: str, keyword: str | None = None) -> list[dict]: ...
 
+    def list_call_log_employees(self, keyword: str | None = None, limit: int = 300) -> list[dict]: ...
+
+    def list_call_logs(
+        self,
+        employee_ids: list[int],
+        start,
+        end,
+        after_id: int | None = None,
+        limit: int = 100,
+    ) -> dict: ...
+
 
 @lru_cache
 def get_gateway() -> LandsoftGateway:

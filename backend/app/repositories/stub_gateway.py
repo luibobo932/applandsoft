@@ -213,6 +213,79 @@ class StubLandsoftGateway:
     def list_streets(self, district_code: str, keyword: str | None = None) -> list[dict]:
         return []
 
+    def list_call_log_employees(self, keyword: str | None = None, limit: int = 300) -> list[dict]:
+        employees = [
+            {"employee_id": 46, "employee_code": "SKL-038", "employee_name": "Hồ Chí Cường", "today_call_count": 2, "latest_call_at": datetime.now(UTC)},
+            {"employee_id": 71, "employee_code": "SKL-063", "employee_name": "Hồ Chí Công", "today_call_count": 1, "latest_call_at": datetime.now(UTC)},
+            {"employee_id": 120, "employee_code": "SKL-109", "employee_name": "Nguyễn Hửu Lợi", "today_call_count": 0, "latest_call_at": None},
+            {"employee_id": 426, "employee_code": "SKL-409", "employee_name": "Nguyễn Viết Ca", "today_call_count": 3, "latest_call_at": datetime.now(UTC)},
+        ]
+        needle = (keyword or "").strip().casefold()
+        if needle:
+            employees = [
+                item for item in employees
+                if needle in item["employee_code"].casefold() or needle in item["employee_name"].casefold()
+            ]
+        return employees[:limit]
+
+    def list_call_logs(
+        self,
+        employee_ids: list[int],
+        start,
+        end,
+        after_id: int | None = None,
+        limit: int = 100,
+    ) -> dict:
+        logs = [
+            {
+                "log_id": 101,
+                "called_at": datetime.now(UTC),
+                "employee_id": 426,
+                "employee_code": "SKL-409",
+                "employee_name": "Nguyễn Viết Ca",
+                "landsoft_id": 1001,
+                "house_number": "61.",
+                "street_name": "Đường 100 Bình Thới",
+                "district_name": "Q.11",
+                "address": "61. Đường 100 Bình Thới",
+                "width": 4,
+                "length": 16,
+                "area": 64,
+                "price": 14.8,
+                "owner_phone": "0906862996",
+                "created_at": datetime.now(UTC),
+            },
+            {
+                "log_id": 100,
+                "called_at": datetime.now(UTC),
+                "employee_id": 46,
+                "employee_code": "SKL-038",
+                "employee_name": "Hồ Chí Cường",
+                "landsoft_id": 1002,
+                "house_number": "CC5",
+                "street_name": "Trường Sơn",
+                "district_name": "Q.10",
+                "address": "CC5 Trường Sơn",
+                "width": 4,
+                "length": 28,
+                "area": 112,
+                "price": 30,
+                "owner_phone": "0903388883",
+                "created_at": datetime.now(UTC),
+            },
+        ]
+        if employee_ids:
+            logs = [item for item in logs if int(item["employee_id"]) in employee_ids]
+        if after_id is not None:
+            logs = [item for item in logs if int(item["log_id"]) > after_id]
+        return {
+            "items": logs[:limit],
+            "total": len(logs),
+            "limit": limit,
+            "after_id": after_id,
+            "latest_id": max((int(item["log_id"]) for item in logs), default=after_id),
+        }
+
     def create_property(self, payload: dict, actor: AuthenticatedUser) -> dict:
         district_name = next((item["label"] for item in self.lookups["districts"] if item["code"] == payload["district_code"]), payload["district_code"])
         ward_name = next((item["label"] for item in self.lookups["wards"] if item["code"] == payload["ward_code"]), payload["ward_code"])

@@ -111,3 +111,19 @@ def test_create_property_and_activity() -> None:
     activity_response = client.get("/api/v1/activity/recent", headers=headers)
     assert activity_response.status_code == 200
     assert len(activity_response.json()) >= 1
+
+
+def test_call_logs_endpoints() -> None:
+    headers = login_headers()
+
+    employees_response = client.get("/api/v1/call-logs/employees", headers=headers)
+    assert employees_response.status_code == 200
+    employees = employees_response.json()
+    assert any(item["employee_code"] == "SKL-409" for item in employees)
+
+    logs_response = client.get("/api/v1/call-logs?employee_ids=426&limit=20", headers=headers)
+    assert logs_response.status_code == 200
+    payload = logs_response.json()
+    assert payload["total"] >= 1
+    assert payload["items"][0]["employee_code"] == "SKL-409"
+    assert payload["items"][0]["owner_phone"]

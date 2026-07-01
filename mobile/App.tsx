@@ -20,6 +20,7 @@ import { LoginScreen } from "./src/screens/LoginScreen";
 import { PropertyListScreen } from "./src/screens/PropertyListScreen";
 import { PropertyDetailScreen } from "./src/screens/PropertyDetailScreen";
 import { ActivityScreen } from "./src/screens/ActivityScreen";
+import { CallLogsScreen } from "./src/screens/CallLogsScreen";
 import { LandsoftWorkspaceScreen } from "./src/screens/LandsoftWorkspaceScreen";
 import { styles } from "./src/styles";
 import {
@@ -162,6 +163,9 @@ export default function App() {
     if (activeTab === "activity") {
       return "Lịch sử";
     }
+    if (activeTab === "callLogs") {
+      return "Theo dõi gọi SĐT";
+    }
     return "Kho hàng";
   }, [activeTab, selectedPropertyId]);
 
@@ -208,11 +212,15 @@ export default function App() {
         }
       }
 
-      // 2. Khong co phien hoac token het han -> tu dang nhap lai (creds da luu, hoac creds dong san)
+      // 2. Khong co phien hoac token het han -> tu dang nhap lai.
       if (!activeSession) {
-        const creds = storedCreds ? JSON.parse(storedCreds) : null;
-        const username = creds?.username ?? DEBUG_AUTO_LOGIN_USER;
-        const password = creds?.password ?? DEBUG_AUTO_LOGIN_PASSWORD;
+        const savedCreds = storedCreds ? JSON.parse(storedCreds) : null;
+        const creds =
+          DEBUG_AUTO_LOGIN_USER && DEBUG_AUTO_LOGIN_PASSWORD
+            ? { username: DEBUG_AUTO_LOGIN_USER, password: DEBUG_AUTO_LOGIN_PASSWORD }
+            : savedCreds;
+        const username = creds?.username;
+        const password = creds?.password;
         if (username && password) {
           try {
             const response = await login({ username, password });
@@ -510,6 +518,10 @@ export default function App() {
           // BUG FIX: was () => loadActivity(...) — Promise not awaited
           onReload={async () => { await loadActivity(session.token); }}
         />
+      ) : null}
+
+      {activeTab === "callLogs" ? (
+        <CallLogsScreen token={session.token} />
       ) : null}
 
       {!isPropertyDetailView ? (

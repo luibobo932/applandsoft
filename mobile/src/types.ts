@@ -158,3 +158,38 @@ export type ActivityItem = {
   created_at?: string;
   server_time?: string;
 };
+
+export type CallLogEmployee = {
+  employee_id: number;
+  employee_code: string;
+  employee_name: string;
+  today_call_count: number;
+  latest_call_at?: string | null;
+};
+
+export type CallLogItem = {
+  log_id: number;
+  called_at: string;
+  employee_id: number;
+  employee_code: string;
+  employee_name: string;
+  landsoft_id: number;
+  house_number?: string | null;
+  street_name?: string | null;
+  district_name?: string | null;
+  address?: string | null;
+  width?: number | null;
+  length?: number | null;
+  area?: number | null;
+  price?: number | null;
+  owner_phone?: string | null;
+  created_at?: string | null;
+};
+
+export type PagedCallLogsResponse = {
+  items: CallLogItem[];
+  total: number;
+  limit: number;
+  after_id?: number | null;
+  latest_id?: number | null;
+};
