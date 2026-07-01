@@ -4,7 +4,8 @@ import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
 
-import { fetchCallLogEmployees, fetchCallLogs } from "../api";
+import { fetchCallLogEmployees, fetchCallLogs, registerPushToken } from "../api";
+import { registerForCallLogPushAsync } from "../notifications";
 import { styles } from "../styles";
 import { CallLogEmployee, CallLogItem } from "../types";
 import { cleanDisplayText, formatArea, formatDateTime, normalizeApiError } from "../utils";
@@ -59,9 +60,14 @@ function employeeLabel(employee: CallLogEmployee): string {
   return `${cleanDisplayText(employee.employee_code)} - ${cleanDisplayText(employee.employee_name)}`;
 }
 
-function summarizeEvent(item: CallLogItem): string {
-  const address = cleanDisplayText(item.address, `${cleanDisplayText(item.house_number, "")} ${cleanDisplayText(item.street_name, "")}`.trim());
-  return `${cleanDisplayText(item.employee_name)} gọi ${address}, ${cleanDisplayText(item.district_name, "")}`;
+function employeeInitials(name: string): string {
+  const clean = cleanDisplayText(name, "").trim();
+  if (!clean) {
+    return "?";
+  }
+  const parts = clean.split(/\s+/);
+  const last = parts[parts.length - 1] ?? "";
+  return (last[0] ?? "?").toLocaleUpperCase("vi");
 }
 
 function CallLogCard({ item }: { item: CallLogItem }) {
@@ -107,6 +113,7 @@ export function CallLogsScreen({ token }: { token: string }) {
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [loadingDetailLogs, setLoadingDetailLogs] = useState(false);
   const [pollingEnabled, setPollingEnabled] = useState(true);
+  const [pushToken, setPushToken] = useState<string | null>(null);
   const latestSeenIdRef = useRef<number | null>(null);
 
   const presetLabel = useMemo(() => datePresets.find((item) => item.key === preset)?.label ?? "Hôm nay", [preset]);
@@ -202,13 +209,7 @@ export function CallLogsScreen({ token }: { token: string }) {
         return [...fresh, ...current].slice(0, 200);
       });
       setTotal((current) => current + response.items.length);
-      const first = response.items[0];
-      Alert.alert(
-        "Có nhân viên vừa gọi SĐT",
-        response.items.length === 1
-          ? summarizeEvent(first)
-          : `${response.items.length} lượt mới. Mới nhất: ${summarizeEvent(first)}`
-      );
+      // Thong bao that (he thong) da duoc backend day qua Expo Push, khong can Alert trong app nua.
     } catch {
       // Polling im lang khi mang/DB loi tam thoi de khong spam alert.
     }
@@ -228,6 +229,18 @@ export function CallLogsScreen({ token }: { token: string }) {
   useEffect(() => {
     void initializeWatchBaseline();
   }, [initializeWatchBaseline]);
+
+  // Xin quyen thong bao he thong 1 lan khi vao man hinh nay.
+  useEffect(() => {
+    void registerForCallLogPushAsync().then(setPushToken);
+  }, []);
+
+  // Dong bo push token + danh sach NV dang bat bao len backend, de backend tu day
+  // thong bao that (Expo Push) ke ca khi da tat app.
+  useEffect(() => {
+    if (!pushToken) return;
+    void registerPushToken(token, pushToken, watchedIds).catch(() => undefined);
+  }, [pushToken, token, watchedIds]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -370,6 +383,7 @@ export function CallLogsScreen({ token }: { token: string }) {
                 {visibleEmployees.slice(0, 80).map((employee) => {
                   const selected = selectedSet.has(employee.employee_id);
                   const watched = watchedSet.has(employee.employee_id);
+                  const hasCalls = employee.today_call_count > 0;
                   return (
                     <View key={employee.employee_id} style={[styles.callLogEmployeeRow, selected && styles.callLogEmployeeRowSelected]}>
                       <Pressable
@@ -377,11 +391,22 @@ export function CallLogsScreen({ token }: { token: string }) {
                         onPress={() => void openEmployeeDetails(employee)}
                         onLongPress={() => toggleSelected(employee.employee_id)}
                       >
-                        <Text style={styles.callLogEmployeeName}>{employeeLabel(employee)}</Text>
-                        <Text style={styles.callLogEmployeeMeta}>
-                          Hôm nay: {employee.today_call_count} lượt
-                          {employee.latest_call_at ? ` · ${formatDateTime(employee.latest_call_at)}` : ""}
-                        </Text>
+                        <View style={[styles.callLogEmployeeAvatar, hasCalls && styles.callLogEmployeeAvatarActive]}>
+                          <Text style={styles.callLogEmployeeAvatarText}>{employeeInitials(employee.employee_name)}</Text>
+                        </View>
+                        <View style={styles.callLogEmployeeTextWrap}>
+                          <Text style={styles.callLogEmployeeName}>{employeeLabel(employee)}</Text>
+                          <View style={styles.callLogEmployeeMetaRow}>
+                            <View style={[styles.callLogEmployeeCountBadge, hasCalls && styles.callLogEmployeeCountBadgeActive]}>
+                              <Text style={[styles.callLogEmployeeCountBadgeText, hasCalls && styles.callLogEmployeeCountBadgeTextActive]}>
+                                {employee.today_call_count} lượt hôm nay
+                              </Text>
+                            </View>
+                            {employee.latest_call_at ? (
+                              <Text style={styles.callLogEmployeeMeta}>{formatDateTime(employee.latest_call_at)}</Text>
+                            ) : null}
+                          </View>
+                        </View>
                       </Pressable>
                       <Pressable
                         style={[styles.callLogWatchButton, watched && styles.callLogWatchButtonOn]}

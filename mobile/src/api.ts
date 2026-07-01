@@ -298,3 +298,18 @@ export async function fetchCallLogs(
   query.set("limit", String(params.limit ?? 100));
   return request<PagedCallLogsResponse>(`/call-logs?${query.toString()}`, {}, token);
 }
+
+export async function registerPushToken(
+  token: string,
+  expoPushToken: string,
+  employeeIds: number[]
+): Promise<void> {
+  await request(
+    "/push/register",
+    {
+      method: "POST",
+      body: JSON.stringify({ expo_push_token: expoPushToken, employee_ids: employeeIds }),
+    },
+    token
+  );
+}

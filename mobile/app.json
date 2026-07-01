@@ -22,6 +22,21 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-foreground.png",
+          "color": "#F37021"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8fad4f2b-3d93-42e3-94e5-ee405bd21bb0"
+      }
+    },
+    "owner": "luibobo"
   }
 }

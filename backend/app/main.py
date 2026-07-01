@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,19 +8,31 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 
 from app.core.config import get_settings
 from app.db.sqlserver import check_sql_connection
-from app.routers import activity, auth, call_logs, lookups, me, properties
+from app.routers import activity, auth, call_logs, lookups, me, properties, push
+from app.services.push_notifier import run_push_notifier_loop
 
 logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        task = None
+        if not settings.use_stub_gateway:
+            task = asyncio.create_task(run_push_notifier_loop())
+        yield
+        if task:
+            task.cancel()
+
     app = FastAPI(
         title=settings.app_name,
         version="0.1.0",
         openapi_url=f"{settings.api_prefix}/openapi.json",
         docs_url=f"{settings.api_prefix}/docs",
         redoc_url=f"{settings.api_prefix}/redoc",
+        lifespan=lifespan,
     )
 
     app.add_middleware(
@@ -203,6 +217,7 @@ def create_app() -> FastAPI:
     app.include_router(properties.router, prefix=settings.api_prefix)
     app.include_router(activity.router, prefix=settings.api_prefix)
     app.include_router(call_logs.router, prefix=settings.api_prefix)
+    app.include_router(push.router, prefix=settings.api_prefix)
     return app
 
 
