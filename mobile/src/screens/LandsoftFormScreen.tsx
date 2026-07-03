@@ -108,6 +108,47 @@ function WfCheck({ label, checked, onToggle }: { label: string; checked: boolean
   );
 }
 
+// O nhap so thap phan: giu nguyen chuoi dang go ("3," / "3.7") de dau phay
+// khong bi xoa boi re-render; chap nhan ca dau phay lan dau cham
+function WfDecimal({
+  value,
+  onChange,
+  placeholder,
+  suffix,
+}: {
+  value?: number;
+  onChange: (v: number) => void;
+  placeholder?: string;
+  suffix?: string;
+}) {
+  const [text, setText] = useState(value ? String(value) : "");
+  useEffect(() => {
+    // Gia tri bi doi tu ben ngoai (dan tin / xoa nhap) -> dong bo lai chuoi
+    const parsed = parseNumberInput(text);
+    if ((value ?? 0) !== parsed) setText(value ? String(value) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  const input = (
+    <TextInput
+      style={[styles.wfInput, suffix ? { flex: 1 } : null]}
+      keyboardType="decimal-pad"
+      value={text}
+      onChangeText={(v) => {
+        setText(v);
+        onChange(parseNumberInput(v));
+      }}
+      placeholder={placeholder}
+    />
+  );
+  if (!suffix) return input;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      {input}
+      <Text style={styles.wfRadioText}>{suffix}</Text>
+    </View>
+  );
+}
+
 function WfSelect({
   value,
   items,
@@ -573,25 +614,11 @@ export function LandsoftFormScreen({
           />
         </WfRow>
         <WfRow label="Giá bán">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="decimal-pad"
-            value={draft.price ? String(draft.price) : ""}
-            onChangeText={(v) => onChangeDraft({ price: parseNumberInput(v) })}
-            placeholder="tỷ"
-          />
+          <WfDecimal value={draft.price} onChange={(v) => onChangeDraft({ price: v })} placeholder="tỷ (VD: 3.7)" />
         </WfRow>
         {giaQuyDoi ? <Text style={styles.wfHint}>{giaQuyDoi}</Text> : null}
         <WfRow label="Phí môi giới">
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <TextInput
-              style={[styles.wfInput, { flex: 1 }]}
-              keyboardType="decimal-pad"
-              value={String(draft.brokerage_percent ?? 1)}
-              onChangeText={(v) => onChangeDraft({ brokerage_percent: parseNumberInput(v) })}
-            />
-            <Text style={styles.wfRadioText}>%</Text>
-          </View>
+          <WfDecimal value={draft.brokerage_percent ?? 1} onChange={(v) => onChangeDraft({ brokerage_percent: v })} suffix="%" />
         </WfRow>
         <WfRow label="Chia sẻ">
           <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="Nội bộ" editable={false} />
@@ -625,12 +652,9 @@ export function LandsoftFormScreen({
           </WfRow>
         ) : null}
         <WfRow label="Ngang KV">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="decimal-pad"
-            value={draft.width ? String(draft.width) : ""}
-            onChangeText={(v) => {
-              const width = parseNumberInput(v);
+          <WfDecimal
+            value={draft.width}
+            onChange={(width) => {
               // Dien tich = Ngang x Dai (tu tinh)
               const area = width > 0 && (draft.length ?? 0) > 0 ? Math.round(width * (draft.length ?? 0) * 100) / 100 : draft.area;
               onChangeDraft({ width, area });
@@ -639,12 +663,9 @@ export function LandsoftFormScreen({
           />
         </WfRow>
         <WfRow label="Dài KV">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="decimal-pad"
-            value={draft.length ? String(draft.length) : ""}
-            onChangeText={(v) => {
-              const length = parseNumberInput(v);
+          <WfDecimal
+            value={draft.length}
+            onChange={(length) => {
               const area = length > 0 && (draft.width ?? 0) > 0 ? Math.round((draft.width ?? 0) * length * 100) / 100 : draft.area;
               onChangeDraft({ length, area });
             }}
