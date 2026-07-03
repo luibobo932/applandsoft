@@ -18,7 +18,9 @@ const moduleGroups: Array<{ title: string; items: ModuleItem[] }> = [
   {
     title: "Giao dịch bất động sản",
     items: [
+      { key: "kingland", label: "Bản King Land (desktop)", description: "Lưới sản phẩm đầy đủ cột y như phần mềm trên máy tính", icon: "monitor", target: "kingland" },
       { key: "properties", label: "Sản phẩm bán, cho thuê", description: "Kho nhà, tìm kiếm, bộ lọc và chi tiết căn", icon: "home", target: "properties" },
+      { key: "create", label: "Đăng ký bán, cho thuê", description: "Nhập nhà mới trực tiếp vào Landsoft", icon: "plus-circle", target: "create" },
       { key: "buyer-needs", label: "Nhu cầu mua, thuê", description: "Quản lý nhu cầu và ghép căn phù hợp", icon: "search" },
       { key: "transactions", label: "Quản lý giao dịch", description: "Theo dõi cọc, công chứng và hoàn tất", icon: "repeat" },
     ],
@@ -26,7 +28,7 @@ const moduleGroups: Array<{ title: string; items: ModuleItem[] }> = [
   {
     title: "Khách hàng & công việc",
     items: [
-      { key: "customers", label: "Khách hàng", description: "Danh bạ, lịch sử chăm sóc và nhu cầu", icon: "users" },
+      { key: "customers", label: "Khách hàng", description: "Danh bạ 73.000+ khách, tìm theo tên/SĐT, xem căn đứng tên", icon: "users", target: "customers" },
       { key: "callLogs", label: "Theo dõi gọi SĐT", description: "Xem nhân viên đã gọi căn nào và bật báo theo người", icon: "phone-call", target: "callLogs" },
       { key: "activity", label: "Lịch sử thực hiện", description: "Các thao tác gần đây trên dữ liệu HomeApp", icon: "clock", target: "activity" },
       { key: "calendar", label: "Lịch làm việc", description: "Lịch hẹn, nhắc gọi và việc cần xử lý", icon: "calendar" },
@@ -36,7 +38,7 @@ const moduleGroups: Array<{ title: string; items: ModuleItem[] }> = [
   {
     title: "Quản trị & tiện ích",
     items: [
-      { key: "employees", label: "Nhân viên", description: "Thông tin nhân sự và phân quyền truy cập", icon: "user-check" },
+      { key: "employees", label: "Nhân viên", description: "Danh bạ 500+ nhân viên: mã số, phòng ban, SĐT", icon: "user-check", target: "employees" },
       { key: "documents", label: "Tài liệu", description: "Biểu mẫu, hồ sơ và tài liệu giao dịch", icon: "file-text" },
       { key: "fund", label: "Quỹ", description: "Theo dõi thu chi và công nợ", icon: "credit-card" },
       { key: "other", label: "Khác", description: "Báo cáo, import, export và cấu hình", icon: "grid" },

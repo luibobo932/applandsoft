@@ -19,8 +19,12 @@ import { AppHeader, LandsoftNavBar, LandsoftView } from "./src/components/shared
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { PropertyListScreen } from "./src/screens/PropertyListScreen";
 import { PropertyDetailScreen } from "./src/screens/PropertyDetailScreen";
+import { LandsoftFormScreen } from "./src/screens/LandsoftFormScreen";
 import { ActivityScreen } from "./src/screens/ActivityScreen";
 import { CallLogsScreen } from "./src/screens/CallLogsScreen";
+import { CustomersScreen } from "./src/screens/CustomersScreen";
+import { EmployeesScreen } from "./src/screens/EmployeesScreen";
+import { KingLandScreen } from "./src/screens/KingLandScreen";
 import { LandsoftWorkspaceScreen } from "./src/screens/LandsoftWorkspaceScreen";
 import { styles } from "./src/styles";
 import {
@@ -91,6 +95,7 @@ const emptyLookups: LookupCollections = {
   statuses: [],
   sources: [],
   grades: [],
+  road_types: [],
 };
 
 const emptyFilters: PropertyFilters = {
@@ -160,11 +165,20 @@ export default function App() {
     if (selectedPropertyId && activeTab === "properties") {
       return "Chi tiết căn";
     }
+    if (activeTab === "create") {
+      return "Nhập nhà mới";
+    }
     if (activeTab === "activity") {
       return "Lịch sử";
     }
     if (activeTab === "callLogs") {
       return "Theo dõi gọi SĐT";
+    }
+    if (activeTab === "customers") {
+      return "Khách hàng";
+    }
+    if (activeTab === "employees") {
+      return "Nhân viên";
     }
     return "Kho hàng";
   }, [activeTab, selectedPropertyId]);
@@ -465,7 +479,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.appShell}>
       <StatusBar style="dark" />
-      {!isPropertyDetailView ? (
+      {!isPropertyDetailView && activeTab !== "kingland" ? (
         <AppHeader user={session.user} title={title} onLogout={() => void handleLogout()} />
       ) : null}
 
@@ -508,6 +522,22 @@ export default function App() {
           onLoadMore={handleLoadMore}
           onOpenProperty={(landsoftId) => setSelectedPropertyId(landsoftId)}
           onQuickViewPhone={handleQuickViewPhone}
+          onGoCreate={() => setActiveTab("create")}
+        />
+      ) : null}
+
+      {activeTab === "create" ? (
+        <LandsoftFormScreen
+          token={session.token}
+          lookups={lookups}
+          draft={draft}
+          savingDraft={savingDraft}
+          staffName={cleanDisplayText(session.user.display_name)}
+          onChangeDraft={updateDraft}
+          onSubmitSuccess={async () => {
+            setActiveTab("properties");
+            await Promise.all([loadProperties(session.token, filters), loadActivity(session.token)]);
+          }}
         />
       ) : null}
 
@@ -522,6 +552,31 @@ export default function App() {
 
       {activeTab === "callLogs" ? (
         <CallLogsScreen token={session.token} />
+      ) : null}
+
+      {activeTab === "employees" ? (
+        <EmployeesScreen token={session.token} />
+      ) : null}
+
+      {activeTab === "customers" ? (
+        <CustomersScreen
+          token={session.token}
+          onOpenProperty={(landsoftId) => {
+            setActiveTab("properties");
+            setSelectedPropertyId(landsoftId);
+          }}
+        />
+      ) : null}
+
+      {activeTab === "kingland" ? (
+        <KingLandScreen
+          token={session.token}
+          lookups={lookups}
+          onNavigate={(view) => {
+            setSelectedPropertyId(null);
+            setActiveTab(view);
+          }}
+        />
       ) : null}
 
       {!isPropertyDetailView ? (

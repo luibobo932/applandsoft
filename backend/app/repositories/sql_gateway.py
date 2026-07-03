@@ -23,6 +23,10 @@ class SqlLandsoftGateway:
         LEFT JOIN dbo.LoaiBDS lbds ON lbds.MaLBDS = bc.MaLBDS
         LEFT JOIN dbo.mglbcTrangThai tt ON tt.MaTT = bc.MaTT
         LEFT JOIN dbo.KhachHang kh ON kh.MaKH = bc.MaKH
+        LEFT JOIN dbo.mglCapDo cd ON cd.MaCD = bc.MaCD
+        LEFT JOIN dbo.mglNguon nguon ON nguon.MaNguon = bc.MaNguon
+        LEFT JOIN dbo.PhuongHuong ph ON ph.MaPhuongHuong = bc.MaHuong
+        LEFT JOIN dbo.NhanVien nvkd ON nvkd.MaNV = bc.MaNVKD
         WHERE bc.KichHoat = 1
     """
 
@@ -53,7 +57,17 @@ class SqlLandsoftGateway:
             COALESCE(NULLIF(kh.DiDong, N''), NULLIF(bc.DienThoaiNDD, N''), N'') AS contact_phone,
             CAST(COALESCE(NULLIF(bc.NgangKV, 0), 0) AS float) AS width,
             CAST(COALESCE(NULLIF(bc.DaiKV, 0), 0) AS float) AS length,
-            bc.NgayDK AS created_at
+            bc.NgayDK AS created_at,
+            COALESCE(bc.SoNha, N'') AS house_number,
+            COALESCE(s.Names, N'') AS street_name,
+            COALESCE(lbds.TenLBDS, N'') AS property_type_name,
+            COALESCE(cd.TenCD, N'') AS grade_name,
+            COALESCE(nguon.TenNguon, N'') AS source_name,
+            COALESCE(ph.TenPhuongHuong, N'') AS direction_name,
+            COALESCE(NULLIF(nvkd.HoTen, N''), NULLIF(nvkd.MaSo, N''), N'') AS agent_name,
+            CAST(COALESCE(bc.PhiMG, 0) AS float) AS phi_mg,
+            COALESCE(bc.NoteDoiGia, N'') AS note_doi_gia,
+            COALESCE(bc.NoteDaBan, N'') AS note_da_ban
     """
 
     DETAIL_SQL = """
@@ -324,6 +338,214 @@ class SqlLandsoftGateway:
             name = (row[1] or "").strip() or None
             return {"count": int(row[0]), "owner_name": name}
 
+    @staticmethod
+    def _norm_phone_sql(column: str) -> str:
+        return (
+            "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE("
+            f"LTRIM(RTRIM(COALESCE({column}, N''))),"
+            "N' ', N''), N'.', N''), N'-', N''), N'(', N''), N')', N'')"
+        )
+
+    def get_next_property_code(self) -> int:
+        """So DK du kien cho can moi — giong o 'So DK' tu hien khi mo form Landsoft."""
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT ISNULL(MAX(MaBC), 0) + 1 FROM dbo.mglbcBanChoThue")
+            return int(cursor.fetchone()[0])
+
+    def list_customers(self, keyword: str | None, page: int, page_size: int) -> tuple[list[dict], int]:
+        """Danh ba khach hang Landsoft: tim theo ten hoac SDT, phan trang."""
+        page = max(int(page or 1), 1)
+        page_size = max(min(int(page_size or 30), 200), 1)
+        offset = (page - 1) * page_size
+        kw = (keyword or "").strip()
+        digits = "".join(ch for ch in kw if ch.isdigit())
+
+        where = "WHERE 1=1"
+        params: list = []
+        if kw:
+            if len(digits) >= 4 and len(digits) >= len(kw) - 3:
+                # Keyword chu yeu la so -> tim theo SDT (ca DiDong va DiDong2)
+                where += (
+                    f" AND ({self._norm_phone_sql('kh.DiDong')} LIKE ?"
+                    f" OR {self._norm_phone_sql('kh.DiDong2')} LIKE ?)"
+                )
+                params += [f"%{digits}%", f"%{digits}%"]
+            else:
+                where += (
+                    " AND LTRIM(RTRIM(COALESCE(kh.HoKH, N'') + N' ' + COALESCE(kh.TenKH, N''))) LIKE ?"
+                )
+                params.append(f"%{kw}%")
+
+        base = "FROM dbo.KhachHang kh LEFT JOIN dbo.NhanVien nv ON nv.MaNV = kh.MaNV"
+        select = """
+            SELECT
+                kh.MaKH,
+                LTRIM(RTRIM(COALESCE(kh.HoKH, N'') + CASE WHEN ISNULL(kh.HoKH, N'') <> N'' AND ISNULL(kh.TenKH, N'') <> N'' THEN N' ' ELSE N'' END + COALESCE(kh.TenKH, N''))) AS full_name,
+                NULLIF(LTRIM(RTRIM(COALESCE(kh.DiDong, N''))), N'') AS phone,
+                NULLIF(LTRIM(RTRIM(COALESCE(kh.DiDong2, N''))), N'') AS phone2,
+                NULLIF(LTRIM(RTRIM(COALESCE(kh.DiaChi, N''))), N'') AS address,
+                CONVERT(nvarchar(19), kh.NgayDangKy, 120) AS registered_at,
+                nv.HoTen AS staff_name,
+                (SELECT COUNT(*) FROM dbo.mglbcBanChoThue bc WHERE bc.MaKH = kh.MaKH) AS property_count
+        """
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) {base} {where}", params)
+            total = int(cursor.fetchone()[0])
+            cursor.execute(
+                f"{select} {base} {where} ORDER BY kh.MaKH DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
+                (*params, offset, page_size),
+            )
+            columns = [c[0] for c in cursor.description]
+            items = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        for item in items:
+            item["makh"] = int(item.pop("MaKH"))
+            item["full_name"] = item.get("full_name") or f"KH {item['makh']}"
+            item["property_count"] = int(item.get("property_count") or 0)
+        return items, total
+
+    def get_customer(self, makh: int) -> dict | None:
+        """Ho so khach hang: thong tin + ghi chu + danh sach can dang dung ten."""
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    kh.MaKH,
+                    LTRIM(RTRIM(COALESCE(kh.HoKH, N'') + CASE WHEN ISNULL(kh.HoKH, N'') <> N'' AND ISNULL(kh.TenKH, N'') <> N'' THEN N' ' ELSE N'' END + COALESCE(kh.TenKH, N''))) AS full_name,
+                    NULLIF(LTRIM(RTRIM(COALESCE(kh.DiDong, N''))), N'') AS phone,
+                    NULLIF(LTRIM(RTRIM(COALESCE(kh.DiDong2, N''))), N'') AS phone2,
+                    NULLIF(LTRIM(RTRIM(COALESCE(kh.DiaChi, N''))), N'') AS address,
+                    CONVERT(nvarchar(19), kh.NgayDangKy, 120) AS registered_at,
+                    nv.HoTen AS staff_name,
+                    NULLIF(LTRIM(RTRIM(COALESCE(kh.Email, N''))), N'') AS email,
+                    NULLIF(LTRIM(RTRIM(CAST(COALESCE(kh.GhiChu, N'') AS nvarchar(max)))), N'') AS note_text
+                FROM dbo.KhachHang kh
+                LEFT JOIN dbo.NhanVien nv ON nv.MaNV = kh.MaNV
+                WHERE kh.MaKH = ?
+                """,
+                makh,
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            columns = [c[0] for c in cursor.description]
+            detail = dict(zip(columns, row))
+            detail["makh"] = int(detail.pop("MaKH"))
+            detail["full_name"] = detail.get("full_name") or f"KH {detail['makh']}"
+
+            cursor.execute(
+                """
+                SELECT CONVERT(nvarchar(19), NgayGhiChu, 120) AS created_at,
+                       NULLIF(LTRIM(RTRIM(COALESCE(TieuDe, N''))), N'') AS title,
+                       NULLIF(LTRIM(RTRIM(CAST(COALESCE(NoiDung, N'') AS nvarchar(max)))), N'') AS content
+                FROM dbo.KhachHang_GhiChu WHERE MaKH = ? ORDER BY STT DESC
+                """,
+                makh,
+            )
+            note_cols = [c[0] for c in cursor.description]
+            detail["notes"] = [dict(zip(note_cols, r)) for r in cursor.fetchall()]
+
+            cursor.execute(
+                """
+                SELECT TOP 100
+                    bc.MaBC AS landsoft_id,
+                    COALESCE(
+                        NULLIF(bc.TieuDe, N''),
+                        NULLIF(LTRIM(RTRIM(COALESCE(bc.SoNha, N'') + N' ' + COALESCE(s.Names, N''))), N''),
+                        N'Căn ' + CAST(bc.MaBC AS nvarchar(20))
+                    ) AS title,
+                    LTRIM(RTRIM(
+                        COALESCE(bc.SoNha, N'')
+                        + CASE WHEN ISNULL(bc.SoNha, N'') <> N'' AND ISNULL(s.Names, N'') <> N'' THEN N' ' ELSE N'' END
+                        + COALESCE(s.Names, N'')
+                    )) AS address,
+                    h.TenHuyen AS district_name,
+                    CAST(bc.ThanhTien AS float) AS price,
+                    CAST(COALESCE(NULLIF(bc.DienTich, 0), NULLIF(bc.DienTichKV, 0), 0) AS float) AS area,
+                    tt.TenTT AS status_name,
+                    CONVERT(nvarchar(19), bc.NgayDK, 120) AS created_at
+                FROM dbo.mglbcBanChoThue bc
+                LEFT JOIN dbo.Street s ON s.ID = bc.StreetID
+                LEFT JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
+                LEFT JOIN dbo.mglbcTrangThai tt ON tt.MaTT = bc.MaTT
+                WHERE bc.MaKH = ?
+                ORDER BY bc.MaBC DESC
+                """,
+                makh,
+            )
+            prop_cols = [c[0] for c in cursor.description]
+            detail["properties"] = [dict(zip(prop_cols, r)) for r in cursor.fetchall()]
+            return detail
+
+    def list_employees(self, keyword: str | None, page: int, page_size: int) -> tuple[list[dict], int]:
+        """Danh ba nhan vien: ten, ma so, phong ban, chuc vu, SDT."""
+        page = max(int(page or 1), 1)
+        page_size = max(min(int(page_size or 50), 500), 1)
+        offset = (page - 1) * page_size
+        kw = (keyword or "").strip()
+        where = "WHERE 1=1"
+        params: list = []
+        if kw:
+            where += " AND (nv.HoTen LIKE ? OR nv.MaSo LIKE ? OR nv.DienThoai LIKE ?)"
+            params += [f"%{kw}%", f"%{kw}%", f"%{kw}%"]
+        base = (
+            "FROM dbo.NhanVien nv "
+            "LEFT JOIN dbo.PhongBan pb ON pb.MaPB = nv.MaPB "
+            "LEFT JOIN dbo.ChucVu cv ON cv.MaCV = nv.MaCV"
+        )
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) {base} {where}", params)
+            total = int(cursor.fetchone()[0])
+            cursor.execute(
+                f"""
+                SELECT
+                    nv.MaNV AS manv,
+                    NULLIF(LTRIM(RTRIM(COALESCE(nv.MaSo, N''))), N'') AS code,
+                    COALESCE(NULLIF(nv.HoTen, N''), nv.MaSo, CAST(nv.MaNV AS nvarchar(20))) AS full_name,
+                    NULLIF(LTRIM(RTRIM(COALESCE(nv.DienThoai, N''))), N'') AS phone,
+                    NULLIF(LTRIM(RTRIM(COALESCE(nv.Email, N''))), N'') AS email,
+                    pb.TenPB AS department,
+                    cv.TenCV AS role_name,
+                    CAST(COALESCE(nv.Lock, 0) AS int) AS locked
+                {base} {where}
+                ORDER BY CAST(COALESCE(nv.Lock, 0) AS int) ASC, nv.HoTen ASC
+                OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+                """,
+                (*params, offset, page_size),
+            )
+            columns = [c[0] for c in cursor.description]
+            items = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        for item in items:
+            item["manv"] = int(item["manv"])
+            item["locked"] = bool(item.get("locked"))
+        return items, total
+
+    def list_property_history(self, landsoft_id: int) -> list[dict]:
+        """Lich su thay doi cua can (mglbcLichSu): ngay, dien giai, trang thai, nhan vien."""
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT TOP 50
+                    ls.ID AS history_id,
+                    CONVERT(nvarchar(19), ls.NgayTH, 120) AS created_at,
+                    NULLIF(LTRIM(RTRIM(CAST(COALESCE(ls.DienGiai, N'') AS nvarchar(max)))), N'') AS content,
+                    tt.TenTT AS status_name,
+                    COALESCE(NULLIF(nv.HoTen, N''), NULLIF(nv.MaSo, N''), N'') AS staff_name
+                FROM dbo.mglbcLichSu ls
+                LEFT JOIN dbo.mglbcTrangThai tt ON tt.MaTT = ls.MaTT
+                LEFT JOIN dbo.NhanVien nv ON nv.MaNV = ls.MaNV
+                WHERE ls.MaBC = ?
+                ORDER BY ls.ID DESC
+                """,
+                landsoft_id,
+            )
+            columns = [c[0] for c in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
     def list_streets(self, district_code: str, keyword: str | None = None) -> list[dict]:
         """Danh sach ten duong theo quan (cho dropdown 'Tên đường' giong Landsoft lookUpDuong)."""
         code = (district_code or "").strip()
@@ -454,7 +676,8 @@ class SqlLandsoftGateway:
                 "legal_statuses": "SELECT CAST(MaPL AS nvarchar(20)) AS code, TenPL AS label FROM dbo.PhapLy ORDER BY MaPL",
                 "statuses": "SELECT CAST(MaTT AS nvarchar(20)) AS code, TenTT AS label FROM dbo.mglbcTrangThai ORDER BY STT",
                 "sources": "SELECT CAST(MaNguon AS nvarchar(20)) AS code, TenNguon AS label FROM dbo.mglNguon ORDER BY MaNguon",
-                "grades": "SELECT CAST(MaCD AS nvarchar(20)) AS code, TenCD AS label FROM dbo.mglbcCapDo ORDER BY STT, MaCD",
+                "grades": "SELECT CAST(MaCD AS nvarchar(20)) AS code, TenCD AS label FROM dbo.mglCapDo ORDER BY STT, MaCD",
+                "road_types": "SELECT CAST(MaLD AS nvarchar(20)) AS code, TenLD AS label FROM dbo.LoaiDuong ORDER BY MaLD",
             }
 
             payload: dict[str, list[dict[str, Any]]] = {}
@@ -680,33 +903,50 @@ class SqlLandsoftGateway:
         house_number = self._extract_house_number(address_text, payload.get("street_name"))
         description = (payload.get("description") or "").strip()
         note = (payload.get("note") or "").strip()
+        # Phi moi gioi: mac dinh 1% gia ban (user co the doi tren form nhu Landsoft)
+        ty_le_mg = float(payload.get("brokerage_percent") or 1.0)
+        phi_mg = round(total_price * ty_le_mg / 100.0, 4)
 
         with open_sql_connection() as conn:
             conn.autocommit = False
             cursor = conn.cursor()
             try:
-                cursor.execute(
-                    """
+                # SDT da co khach -> dung lai khach cu, KHONG tao ban ghi trung
+                customer_id = None
+                phone_digits = "".join(ch for ch in (payload.get("contact_phone") or "") if ch.isdigit())
+                if len(phone_digits) >= 9:
+                    cursor.execute(
+                        f"SELECT TOP 1 MaKH FROM dbo.KhachHang WHERE {self._norm_phone_sql('DiDong')} = ? ORDER BY MaKH DESC",
+                        phone_digits,
+                    )
+                    existing = cursor.fetchone()
+                    if existing:
+                        customer_id = int(existing[0])
+                if customer_id is None:
+                    cursor.execute(
+                        """
                     DECLARE @t TABLE (MaKH int);
                     INSERT INTO dbo.KhachHang (
-                        HoKH, TenKH, DiDong, Email, DiaChi, MaXa, MaHuyen, MaTinh, MaNV, IsPersonal, NgayDangKy
+                        HoKH, TenKH, DiDong, DiDong2, Email, DiaChi, MaXa, MaHuyen, MaTinh, MaNV, IsPersonal, NgayDangKy
                     )
                     OUTPUT inserted.MaKH INTO @t(MaKH)
-                    VALUES (?, ?, ?, N'', ?, ?, ?, 1, ?, 1, GETDATE());
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1, GETDATE());
                     SELECT TOP 1 MaKH FROM @t;
                     """,
-                    owner_first_name,
-                    owner_last_name,
-                    payload.get("contact_phone") or "",
-                    address_text,
-                    int(payload["ward_code"]),
-                    int(payload["district_code"]),
-                    actor.landsoft_user_id,
-                )
-                customer_row = self._fetch_first_result(cursor)
-                if not customer_row:
-                    raise RuntimeError("Không tạo được khách hàng chủ nhà trong Landsoft.")
-                customer_id = int(customer_row[0])
+                        owner_first_name,
+                        owner_last_name,
+                        payload.get("contact_phone") or "",
+                        payload.get("owner_phone2") or "",
+                        payload.get("owner_email") or "",
+                        (payload.get("owner_address") or address_text),
+                        int(payload["ward_code"]),
+                        int(payload["district_code"]),
+                        actor.landsoft_user_id,
+                    )
+                    customer_row = self._fetch_first_result(cursor)
+                    if not customer_row:
+                        raise RuntimeError("Không tạo được khách hàng chủ nhà trong Landsoft.")
+                    customer_id = int(customer_row[0])
 
                 cursor.execute(
                     """
@@ -725,13 +965,13 @@ class SqlLandsoftGateway:
                     OUTPUT inserted.MaBC INTO @t(MaBC)
                     VALUES (
                         GETDATE(), 0, ?, ?, ?, ?, 0, ?, ?,
-                        N'', ?, NULL, ?, ?, ?, 0, 1, 1,
+                        N'', ?, NULL, ?, ?, ?, ?, 1, 1,
                         ?, ?, ?, ?, ?, ?, ?,
-                        0, ?, ?, ?, ?, 0, 0, ?, ?,
-                        ?, ?, ?, ?, 0, 0, 0, 0, 0,
+                        0, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, 0, 0, 0, 0,
                         NULL, GETDATE(), ?, ?, ?, ?, 1, GETDATE(),
                         N'', ?, NULL, NULL, ?, ?, ?, ?,
-                        ?, NULL, N'', 0, 0, 0, NULL, N'%',
+                        ?, NULL, N'', ?, ?, ?, NULL, N'%',
                         NULL, NULL, NULL
                     );
                     SELECT TOP 1 MaBC FROM @t;
@@ -746,6 +986,7 @@ class SqlLandsoftGateway:
                     area,
                     don_gia,
                     total_price,
+                    self._price_to_vnd(float(payload.get("original_price") or 0)),
                     self._format_price_text(float(payload["price"])),
                     float(payload.get("road_width") or 0),
                     int(payload.get("living_rooms") or 0),
@@ -757,12 +998,15 @@ class SqlLandsoftGateway:
                     address_text,
                     address_text,
                     int(payload["district_code"]),
+                    ty_le_mg,
+                    phi_mg,
                     int(payload.get("direction_code") or 0),
                     int(payload.get("legal_status_code") or 1),
-                    3,
+                    int(payload.get("road_type_code") or 3),
                     area,
                     float(payload.get("width") or 0),
                     float(payload.get("length") or 0),
+                    float(payload.get("back_width") or 0),
                     int(payload.get("grade_code") or 2),
                     int(payload["source_code"]),
                     1 if payload.get("negotiable") else 0,
@@ -773,6 +1017,9 @@ class SqlLandsoftGateway:
                     "mobile-app",
                     payload["title"].strip(),
                     description,
+                    1 if payload.get("has_basement") else 0,
+                    1 if payload.get("has_mezzanine") else 0,
+                    1 if payload.get("has_terrace") else 0,
                 )
                 property_row = self._fetch_first_result(cursor)
                 if not property_row:

@@ -22,6 +22,17 @@ class PropertySummary(BaseModel):
     width: float | None = None
     length: float | None = None
     created_at: datetime | None = None
+    # Cac cot bo sung cho luoi kieu King Land desktop
+    house_number: str | None = None
+    street_name: str | None = None
+    property_type_name: str | None = None
+    grade_name: str | None = None
+    source_name: str | None = None
+    direction_name: str | None = None
+    agent_name: str | None = None
+    phi_mg: float | None = None
+    note_doi_gia: str | None = None
+    note_da_ban: str | None = None
 
 
 class PropertyNote(BaseModel):
@@ -110,6 +121,17 @@ class PropertyCreateRequest(BaseModel):
     description: str | None = None
     note: str | None = None
     listing_type: str = "ban"
+    # Cac truong bo sung theo form Landsoft that
+    owner_phone2: str | None = None
+    owner_email: str | None = None
+    owner_address: str | None = None
+    original_price: float | None = None
+    brokerage_percent: float | None = None
+    road_type_code: str | None = None
+    back_width: float | None = None
+    has_basement: bool = False
+    has_mezzanine: bool = False
+    has_terrace: bool = False
 
 
 class ActivityItem(BaseModel):

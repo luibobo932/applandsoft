@@ -35,6 +35,7 @@ export type LookupCollections = {
   statuses: LookupItem[];
   sources: LookupItem[];
   grades: LookupItem[];
+  road_types: LookupItem[];
 };
 
 export type PropertySummary = {
@@ -56,6 +57,17 @@ export type PropertySummary = {
   width?: number | null;
   length?: number | null;
   created_at?: string | null;
+  // Cot bo sung cho luoi kieu King Land desktop (backend moi tra ve)
+  house_number?: string | null;
+  street_name?: string | null;
+  property_type_name?: string | null;
+  grade_name?: string | null;
+  source_name?: string | null;
+  direction_name?: string | null;
+  agent_name?: string | null;
+  phi_mg?: number | null;
+  note_doi_gia?: string | null;
+  note_da_ban?: string | null;
 };
 
 export type PropertyNote = {
@@ -136,6 +148,16 @@ export type PropertyCreatePayload = {
   description?: string;
   note?: string;
   listing_type?: string;
+  owner_phone2?: string;
+  owner_email?: string;
+  owner_address?: string;
+  original_price?: number;
+  brokerage_percent?: number;
+  road_type_code?: string;
+  back_width?: number;
+  has_basement?: boolean;
+  has_mezzanine?: boolean;
+  has_terrace?: boolean;
 };
 
 export type ActionResponse = {
@@ -192,4 +214,72 @@ export type PagedCallLogsResponse = {
   limit: number;
   after_id?: number | null;
   latest_id?: number | null;
+};
+
+export type CustomerSummary = {
+  makh: number;
+  full_name: string;
+  phone?: string | null;
+  phone2?: string | null;
+  address?: string | null;
+  registered_at?: string | null;
+  staff_name?: string | null;
+  property_count: number;
+};
+
+export type CustomerNote = {
+  created_at?: string | null;
+  title?: string | null;
+  content?: string | null;
+};
+
+export type CustomerProperty = {
+  landsoft_id: number;
+  title: string;
+  address?: string | null;
+  district_name?: string | null;
+  price?: number | null;
+  area?: number | null;
+  status_name?: string | null;
+  created_at?: string | null;
+};
+
+export type CustomerDetail = CustomerSummary & {
+  email?: string | null;
+  note_text?: string | null;
+  notes: CustomerNote[];
+  properties: CustomerProperty[];
+};
+
+export type PagedCustomersResponse = {
+  items: CustomerSummary[];
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export type EmployeeSummary = {
+  manv: number;
+  code?: string | null;
+  full_name: string;
+  phone?: string | null;
+  email?: string | null;
+  department?: string | null;
+  role_name?: string | null;
+  locked: boolean;
+};
+
+export type PagedEmployeesResponse = {
+  items: EmployeeSummary[];
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export type PropertyHistoryItem = {
+  history_id: number;
+  created_at?: string | null;
+  content?: string | null;
+  status_name?: string | null;
+  staff_name?: string | null;
 };

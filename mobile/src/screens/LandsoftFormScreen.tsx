@@ -1,13 +1,20 @@
 import { Feather } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Clipboard from "expo-clipboard";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { Field, Section, SelectField } from "../components/shared";
 import { styles } from "../styles";
 import { normalizeApiError, parseNumberInput } from "../utils";
-import { checkPhone, cleanPhoneCompare, createProperty, fetchStreets } from "../api";
-import { LookupCollections, PropertyCreatePayload } from "../types";
+import { checkPhone, cleanPhoneCompare, createProperty, fetchNextPropertyCode, fetchStreets } from "../api";
+import {
+  ChototListingOption,
+  chototFieldDefaults,
+  parseChototMulti,
+} from "../chototPaste";
+import { LookupCollections, LookupItem, PropertyCreatePayload } from "../types";
 
 // Bo dau tieng Viet de loc khong phan biet dau
 function stripAccents(s: string): string {
@@ -79,11 +86,57 @@ function formatGiaQuyDoi(priceTy?: number): string {
   return `= ${Math.round(priceTy * 1000)} triệu`;
 }
 
+
+// ==== UI kieu WinForms giong Landsoft desktop ====
+function WfRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.wfRow}>
+      <Text style={styles.wfLabel}>{label}</Text>
+      <View style={styles.wfControl}>{children}</View>
+    </View>
+  );
+}
+
+function WfCheck({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
+  return (
+    <Pressable style={styles.wfCheckItem} onPress={onToggle}>
+      <View style={[styles.wfCheckBox, checked && styles.wfCheckBoxChecked]}>
+        {checked ? <Feather name="check" size={11} color="#fff" /> : null}
+      </View>
+      <Text style={styles.wfCheckText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function WfSelect({
+  value,
+  items,
+  onChange,
+  emptyLabel = "",
+}: {
+  value?: string;
+  items: LookupItem[];
+  onChange: (v: string) => void;
+  emptyLabel?: string;
+}) {
+  return (
+    <View style={styles.wfPickerWrap}>
+      <Picker mode="dropdown" selectedValue={value ?? ""} onValueChange={(v) => onChange(String(v ?? ""))} dropdownIconColor="#44536E" style={{ color: "#111827" }}>
+        <Picker.Item label={emptyLabel} value="" />
+        {items.map((item) => (
+          <Picker.Item key={item.code} label={item.label} value={item.code} />
+        ))}
+      </Picker>
+    </View>
+  );
+}
+
 export function LandsoftFormScreen({
   token,
   lookups,
   draft,
   savingDraft,
+  staffName,
   onChangeDraft,
   onSubmitSuccess,
 }: {
@@ -91,10 +144,25 @@ export function LandsoftFormScreen({
   lookups: LookupCollections;
   draft: PropertyCreatePayload;
   savingDraft: boolean;
+  staffName?: string;
   onChangeDraft: (patch: Partial<PropertyCreatePayload>) => void;
   onSubmitSuccess: () => Promise<void>;
 }) {
   const [submitting, setSubmitting] = useState(false);
+
+  // So DK tu hien khi mo form — giong Landsoft (MaBC ke tiep trong SQL)
+  const [nextCode, setNextCode] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchNextPropertyCode(token)
+      .then((code) => {
+        if (!cancelled) setNextCode(code);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const wardOptions = lookups.wards.filter(
     (item) => !draft.district_code || item.parent_code === draft.district_code
@@ -168,6 +236,53 @@ export function LandsoftFormScreen({
     return pool.filter((name) => stripAccents(name).includes(q)).slice(0, 8);
   }, [streets, draft.street_name]);
 
+  // Dan tin Cho Tot tu clipboard (copy tu Telegram) -> tu tach va dien san form.
+  // Copy NHIEU tin cung luc -> hien danh sach de chon tin muon dien.
+  const [listingOptions, setListingOptions] = useState<ChototListingOption[] | null>(null);
+
+  const applyListing = (option: ChototListingOption) => {
+    // Reset cac truong thuoc ve tin cu roi moi ap tin moi — tranh tron 2 tin
+    onChangeDraft({ ...chototFieldDefaults, ...option.patch });
+    setListingOptions(null);
+    const missing: string[] = [];
+    if (!option.patch.address) missing.push("số nhà");
+    if (!option.patch.owner_name) missing.push("tên chủ nhà");
+    if (!option.patch.contact_phone) missing.push("SĐT");
+    Alert.alert(
+      "Đã điền từ tin Chợ Tốt",
+      `Đã điền: ${option.filled.join(", ")}.\n\nKiểm tra lại thông tin${missing.length ? `, bổ sung ${missing.join(" + ")}` : ""} rồi bấm Lưu.`
+    );
+  };
+
+  const pasteFromChotot = async () => {
+    let pasted = "";
+    try {
+      pasted = await Clipboard.getStringAsync();
+    } catch {
+      pasted = "";
+    }
+    if (!pasted.trim()) {
+      Alert.alert(
+        "Clipboard trống",
+        "Hãy mở Telegram, giữ tin nhà từ bot Chợ Tốt → Copy (chọn nhiều tin cũng được), rồi quay lại bấm nút này."
+      );
+      return;
+    }
+    const options = parseChototMulti(pasted, lookups);
+    if (options.length === 0) {
+      Alert.alert(
+        "Không nhận ra tin Chợ Tốt",
+        "Nội dung copy không có địa chỉ / giá / diện tích. Hãy copy nguyên tin nhắn từ bot Telegram."
+      );
+      return;
+    }
+    if (options.length === 1) {
+      applyListing(options[0]);
+      return;
+    }
+    setListingOptions(options);
+  };
+
   const validate = (): string | null => {
     if (!draft.address?.trim()) return "Thiếu số nhà / địa chỉ";
     if (!draft.district_code) return "Thiếu quận";
@@ -211,274 +326,457 @@ export function LandsoftFormScreen({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+    <ScrollView style={styles.wfScreen} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       <View style={styles.detailTopBar}>
         <Text style={styles.lsFormTitle}>Đăng ký bán, cho thuê</Text>
         {savingDraft ? <Text style={styles.createSavingText}>Đang lưu...</Text> : null}
       </View>
       <Text style={styles.lsFormSubtitle}>Nhập nhà mới — lưu thẳng vào hệ thống HomeApp</Text>
 
-      {/* Nhu cau & phan loai */}
-      <Section title="Nhu cầu & phân loại">
-        <View style={styles.listingTypeRow}>
-          <Pressable
-            style={[styles.listingTypeButton, draft.listing_type === "ban" && styles.listingTypeButtonActive]}
-            onPress={() => onChangeDraft({ listing_type: "ban" })}
-          >
-            <Text style={[styles.listingTypeButtonText, draft.listing_type === "ban" && styles.listingTypeButtonTextActive]}>
-              Cần bán
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.listingTypeButton, draft.listing_type === "thue" && styles.listingTypeButtonActive]}
-            onPress={() => onChangeDraft({ listing_type: "thue" })}
-          >
-            <Text style={[styles.listingTypeButtonText, draft.listing_type === "thue" && styles.listingTypeButtonTextActive]}>
-              Cho thuê
-            </Text>
-          </Pressable>
-        </View>
-        <SelectField
-          label="Loại BĐS"
-          value={draft.property_type_code}
-          items={lookups.property_types}
-          onChange={(v) => onChangeDraft({ property_type_code: v })}
-          allowEmpty={false}
-          emptyLabel="Chọn loại BĐS"
-        />
-        <SelectField
-          label="Nguồn tin"
-          value={draft.source_code}
-          items={lookups.sources}
-          onChange={(v) => onChangeDraft({ source_code: v })}
-          allowEmpty={false}
-          emptyLabel="Chọn nguồn tin"
-        />
-        {lookups.grades.length > 0 ? (
-          <SelectField
-            label="Cấp độ"
-            value={draft.grade_code ?? ""}
-            items={lookups.grades}
-            onChange={(v) => onChangeDraft({ grade_code: v })}
-            emptyLabel="Chưa chọn"
-          />
-        ) : null}
-      </Section>
+      <Pressable style={styles.chototPasteButton} onPress={() => void pasteFromChotot()}>
+        <Feather name="clipboard" size={16} color="#ffffff" />
+        <Text style={styles.chototPasteButtonText}>Dán tin Chợ Tốt</Text>
+      </Pressable>
+      <Text style={styles.chototPasteHint}>
+        Copy tin nhà từ bot Telegram rồi bấm nút — app tự điền địa chỉ, quận/phường, giá, diện tích.
+        Copy nhiều tin cùng lúc sẽ hiện danh sách để chọn.
+      </Text>
 
-      {/* Dia chi */}
-      <Section title="Địa chỉ">
-        <SelectField
-          label="Quận / Huyện"
-          value={draft.district_code}
-          items={lookups.districts}
-          onChange={(v) => onChangeDraft({ district_code: v, ward_code: "" })}
-          allowEmpty={false}
-          emptyLabel="Chọn quận"
-        />
-        <SelectField
-          label="Phường / Xã"
-          value={draft.ward_code}
-          items={wardOptions}
-          onChange={(v) => onChangeDraft({ ward_code: v })}
-          allowEmpty={false}
-          emptyLabel="Chọn phường"
-        />
-        <Field label="Tên đường">
+      {/* ===== KHACH HANG (tab dau cua Landsoft) ===== */}
+      <View style={styles.wfGroup}>
+        <Text style={styles.wfGroupTitle}>Khách hàng</Text>
+        <WfRow label="Họ tên (*)">
           <TextInput
-            style={styles.input}
+            style={styles.wfInput}
+            value={draft.owner_name}
+            onChangeText={(v) => onChangeDraft({ owner_name: v })}
+          />
+        </WfRow>
+        <WfRow label="Di động (*)">
+          <TextInput
+            style={[
+              styles.wfInput,
+              // Giong Landsoft: to hong khi con trong (bat buoc) hoac khi SDT trung;
+              // so moi hop le -> nen trang
+              (!draft.contact_phone?.trim() || phoneDup) && styles.wfInputRequiredPhone,
+            ]}
+            keyboardType="phone-pad"
+            value={draft.contact_phone}
+            onChangeText={(v) => onChangeDraft({ contact_phone: v })}
+          />
+        </WfRow>
+        {phoneCheck.checking ? (
+          <Text style={styles.wfHint}>Đang kiểm tra số...</Text>
+        ) : phoneDup ? (
+          <Pressable onPress={() => onChangeDraft({ owner_name: phoneCheck.ownerName ?? "" })}>
+            <Text style={styles.lsPhoneDupWarn}>
+              ⚠ Số di động đã có trong hệ thống{phoneCheck.ownerName ? ` — ${phoneCheck.ownerName} (chạm để điền tên)` : ""}
+            </Text>
+          </Pressable>
+        ) : phoneChecked ? (
+          <Text style={styles.lsPhoneOk}>✓ Số mới — chưa có trong hệ thống</Text>
+        ) : null}
+        <WfRow label="Email">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={draft.owner_email ?? ""}
+            onChangeText={(v) => onChangeDraft({ owner_email: v })}
+          />
+        </WfRow>
+        <WfRow label="Điện thoại">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="phone-pad"
+            value={draft.owner_phone2 ?? ""}
+            onChangeText={(v) => onChangeDraft({ owner_phone2: v })}
+          />
+        </WfRow>
+        <WfRow label="Địa chỉ">
+          <TextInput
+            style={styles.wfInput}
+            value={draft.owner_address ?? ""}
+            onChangeText={(v) => onChangeDraft({ owner_address: v })}
+          />
+        </WfRow>
+        <WfRow label="Khu vực">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="Theo quận đã chọn" editable={false} />
+        </WfRow>
+      </View>
+
+      {/* ===== THONG TIN CO BAN (thu tu doc tung hang cua Landsoft) ===== */}
+      <View style={styles.wfGroup}>
+        <Text style={styles.wfGroupTitle}>Thông tin cơ bản</Text>
+        <WfRow label="Số ĐK (*)">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value={nextCode ? String(nextCode) : "Tự sinh"} editable={false} />
+        </WfRow>
+        <WfRow label="Tỉnh (TP)">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="Hồ Chí Minh" editable={false} />
+        </WfRow>
+        <WfRow label="Diện tích">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="decimal-pad"
+            value={draft.area ? String(draft.area) : ""}
+            onChangeText={(v) => onChangeDraft({ area: parseNumberInput(v) })}
+            placeholder="m²"
+          />
+        </WfRow>
+        <WfRow label="Phí môi giới">
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <TextInput
+              style={[styles.wfInput, { flex: 1 }]}
+              keyboardType="decimal-pad"
+              value={String(draft.brokerage_percent ?? 1)}
+              onChangeText={(v) => onChangeDraft({ brokerage_percent: parseNumberInput(v) })}
+            />
+            <Text style={styles.wfRadioText}>%</Text>
+          </View>
+        </WfRow>
+        <WfRow label="Nhu cầu">
+          <View style={styles.wfRadioRow}>
+            <Pressable style={styles.wfRadioItem} onPress={() => onChangeDraft({ listing_type: "ban" })}>
+              <View style={styles.wfRadioOuter}>
+                {draft.listing_type === "ban" ? <View style={styles.wfRadioInner} /> : null}
+              </View>
+              <Text style={styles.wfRadioText}>Cần bán</Text>
+            </Pressable>
+            <Pressable style={styles.wfRadioItem} onPress={() => onChangeDraft({ listing_type: "thue" })}>
+              <View style={styles.wfRadioOuter}>
+                {draft.listing_type === "thue" ? <View style={styles.wfRadioInner} /> : null}
+              </View>
+              <Text style={styles.wfRadioText}>Cho thuê</Text>
+            </Pressable>
+          </View>
+        </WfRow>
+        <WfRow label="Quận (H)">
+          <WfSelect
+            value={draft.district_code}
+            items={lookups.districts}
+            onChange={(v) => onChangeDraft({ district_code: v, ward_code: "" })}
+          />
+        </WfRow>
+        <WfRow label="Đơn giá">
+          <TextInput
+            style={[styles.wfInput, styles.wfInputDisabled]}
+            value={draft.price > 0 && draft.area > 0 ? `${Math.round((draft.price * 1000) / draft.area)} triệu/m²` : "0"}
+            editable={false}
+          />
+        </WfRow>
+        <WfRow label="Giá gốc">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="decimal-pad"
+            value={draft.original_price ? String(draft.original_price) : ""}
+            onChangeText={(v) => onChangeDraft({ original_price: parseNumberInput(v) })}
+            placeholder="tỷ"
+          />
+        </WfRow>
+        <WfRow label="Loại BĐS (*)">
+          <WfSelect
+            value={draft.property_type_code}
+            items={lookups.property_types}
+            onChange={(v) => onChangeDraft({ property_type_code: v })}
+          />
+        </WfRow>
+        <WfRow label="Phường (Xã)">
+          <WfSelect
+            value={draft.ward_code}
+            items={wardOptions}
+            onChange={(v) => onChangeDraft({ ward_code: v })}
+          />
+        </WfRow>
+        <WfRow label="Giá bán">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="decimal-pad"
+            value={draft.price ? String(draft.price) : ""}
+            onChangeText={(v) => onChangeDraft({ price: parseNumberInput(v) })}
+            placeholder="tỷ"
+          />
+        </WfRow>
+        {giaQuyDoi ? <Text style={styles.wfHint}>{giaQuyDoi}</Text> : null}
+        <WfRow label="Chia sẻ">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="Nội bộ" editable={false} />
+        </WfRow>
+        {lookups.grades.length > 0 ? (
+          <WfRow label="Cấp độ (*)">
+            <WfSelect
+              value={draft.grade_code ?? ""}
+              items={lookups.grades}
+              onChange={(v) => onChangeDraft({ grade_code: v })}
+            />
+          </WfRow>
+        ) : null}
+        <WfRow label="Tên đường">
+          <TextInput
+            style={styles.wfInput}
             value={draft.street_name ?? ""}
             onChangeText={(v) => onChangeDraft({ street_name: v })}
             onFocus={() => setStreetFocused(true)}
             onBlur={() => setTimeout(() => setStreetFocused(false), 200)}
-            placeholder={
-              draft.district_code ? "Gõ để tìm đường..." : "Chọn quận trước"
-            }
+            placeholder={draft.district_code ? "" : "Chọn quận trước"}
             editable={!!draft.district_code}
           />
-          {streetFocused && streetSuggestions.length > 0 ? (
-            <View style={styles.lsStreetDropdown}>
-              {streetSuggestions.map((name) => (
-                <Pressable
-                  key={name}
-                  style={styles.lsStreetItem}
-                  onPress={() => {
-                    onChangeDraft({ street_name: name });
-                    setStreetFocused(false);
-                  }}
-                >
-                  <Feather name="map-pin" size={13} color="#6B7FA3" />
-                  <Text style={styles.lsStreetItemText}>{name}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-          {draft.district_code && streets.length > 0 ? (
-            <Text style={styles.lsStreetHint}>{streets.length} đường trong quận</Text>
-          ) : null}
-        </Field>
-        <Field label="Số nhà / Địa chỉ">
+        </WfRow>
+        {streetFocused && streetSuggestions.length > 0 ? (
+          <View style={styles.lsStreetDropdown}>
+            {streetSuggestions.map((name) => (
+              <Pressable
+                key={name}
+                style={styles.lsStreetItem}
+                onPress={() => {
+                  onChangeDraft({ street_name: name });
+                  setStreetFocused(false);
+                }}
+              >
+                <Feather name="map-pin" size={13} color="#6B7FA3" />
+                <Text style={styles.lsStreetItemText}>{name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        <WfRow label="Loại tiền/ĐVT">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="VNĐ" editable={false} />
+        </WfRow>
+        <WfRow label="Nhân viên">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value={staffName || "Theo tài khoản đăng nhập"} editable={false} />
+        </WfRow>
+        <WfRow label="Nguồn">
+          <WfSelect
+            value={draft.source_code}
+            items={lookups.sources}
+            onChange={(v) => onChangeDraft({ source_code: v })}
+          />
+        </WfRow>
+        <WfRow label="Số nhà">
           <TextInput
-            style={styles.input}
+            style={styles.wfInput}
             value={draft.address}
             onChangeText={(v) => onChangeDraft({ address: v })}
-            placeholder="VD: 172 Nguyễn Trãi"
           />
-        </Field>
-      </Section>
+        </WfRow>
+        {draft.negotiable ? <Text style={styles.wfThuongLuong}>Thương lượng</Text> : null}
+      </View>
 
-      {/* Gia & dien tich */}
-      <Section title="Giá & diện tích">
-        <Field label="Giá bán (tỷ)">
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={draft.price ? String(draft.price) : ""}
-            onChangeText={(v) => onChangeDraft({ price: parseNumberInput(v) })}
-            placeholder="VD: 11"
+      {/* ===== DAC DIEM VA TIEN ICH (thu tu doc tung hang cua Landsoft) ===== */}
+      <View style={styles.wfGroup}>
+        <Text style={styles.wfGroupTitle}>Đặc điểm và tiện ích</Text>
+        <WfRow label="Hướng">
+          <WfSelect
+            value={draft.direction_code ?? ""}
+            items={lookups.directions}
+            onChange={(v) => onChangeDraft({ direction_code: v })}
           />
-          {giaQuyDoi ? <Text style={styles.lsGiaQuyDoi}>{giaQuyDoi}</Text> : null}
-        </Field>
-        <Field label="Diện tích KV (m²)">
+        </WfRow>
+        <WfRow label="Pháp lý">
+          <WfSelect
+            value={draft.legal_status_code ?? ""}
+            items={lookups.legal_statuses}
+            onChange={(v) => onChangeDraft({ legal_status_code: v })}
+          />
+        </WfRow>
+        <WfRow label="Tiện tích">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="" editable={false} />
+        </WfRow>
+        {lookups.road_types.length > 0 ? (
+          <WfRow label="Loại đường">
+            <WfSelect
+              value={draft.road_type_code ?? ""}
+              items={lookups.road_types}
+              onChange={(v) => onChangeDraft({ road_type_code: v })}
+            />
+          </WfRow>
+        ) : null}
+        <WfRow label="P.Khách">
           <TextInput
-            style={styles.input}
+            style={styles.wfInput}
+            keyboardType="number-pad"
+            value={draft.living_rooms ? String(draft.living_rooms) : ""}
+            onChangeText={(v) => onChangeDraft({ living_rooms: parseNumberInput(v) })}
+            placeholder="0"
+          />
+        </WfRow>
+        <WfRow label="P.Tắm">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="number-pad"
+            value={draft.bathrooms ? String(draft.bathrooms) : ""}
+            onChangeText={(v) => onChangeDraft({ bathrooms: parseNumberInput(v) })}
+            placeholder="0"
+          />
+        </WfRow>
+        <WfRow label="P.Ngủ">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="number-pad"
+            value={draft.bedrooms ? String(draft.bedrooms) : ""}
+            onChangeText={(v) => onChangeDraft({ bedrooms: parseNumberInput(v) })}
+            placeholder="0"
+          />
+        </WfRow>
+        <WfRow label="Số tầng">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="number-pad"
+            value={draft.floors ? String(draft.floors) : ""}
+            onChangeText={(v) => onChangeDraft({ floors: parseNumberInput(v) })}
+            placeholder="0"
+          />
+        </WfRow>
+        <WfRow label="Diện tích KV">
+          <TextInput
+            style={styles.wfInput}
             keyboardType="decimal-pad"
             value={draft.area ? String(draft.area) : ""}
             onChangeText={(v) => onChangeDraft({ area: parseNumberInput(v) })}
-            placeholder="VD: 50"
+            placeholder="m²"
           />
-        </Field>
-        <View style={styles.lsGridRow}>
-          <NumField label="Ngang KV (m)" value={draft.width} onChange={(v) => onChangeDraft({ width: v })} placeholder="4" />
-          <NumField label="Dài KV (m)" value={draft.length} onChange={(v) => onChangeDraft({ length: v })} placeholder="10" />
-          <NumField label="Đường rộng (m)" value={draft.road_width} onChange={(v) => onChangeDraft({ road_width: v })} placeholder="6" />
-        </View>
-      </Section>
-
-      {/* Ket cau */}
-      <Section title="Kết cấu">
-        <View style={styles.lsGridRow}>
-          <NumField label="Số tầng" value={draft.floors} onChange={(v) => onChangeDraft({ floors: v })} placeholder="0" />
-          <NumField label="P. Ngủ" value={draft.bedrooms} onChange={(v) => onChangeDraft({ bedrooms: v })} placeholder="0" />
-          <NumField label="P. Tắm" value={draft.bathrooms} onChange={(v) => onChangeDraft({ bathrooms: v })} placeholder="0" />
-          <NumField label="P. Khách" value={draft.living_rooms} onChange={(v) => onChangeDraft({ living_rooms: v })} placeholder="0" />
-        </View>
-      </Section>
-
-      {/* Phap ly & huong */}
-      <Section title="Pháp lý & hướng">
-        <SelectField
-          label="Pháp lý"
-          value={draft.legal_status_code ?? ""}
-          items={lookups.legal_statuses}
-          onChange={(v) => onChangeDraft({ legal_status_code: v })}
-          emptyLabel="Chưa chọn"
-        />
-        <SelectField
-          label="Hướng"
-          value={draft.direction_code ?? ""}
-          items={lookups.directions}
-          onChange={(v) => onChangeDraft({ direction_code: v })}
-          emptyLabel="Chưa chọn"
-        />
-        <View style={styles.lsCheckGroup}>
-          <CheckRow
-            label="Chính chủ"
-            checked={!!draft.direct_owner}
-            onToggle={() => onChangeDraft({ direct_owner: !draft.direct_owner })}
-          />
-          <CheckRow
-            label="Thương lượng"
-            checked={!!draft.negotiable}
-            onToggle={() => onChangeDraft({ negotiable: !draft.negotiable })}
-          />
-        </View>
-      </Section>
-
-      {/* Chu nha */}
-      <Section title="Khách hàng (chủ nhà)">
-        <Field label="Họ tên (*)">
+        </WfRow>
+        <WfRow label="Ngang KV">
           <TextInput
-            style={styles.input}
-            value={draft.owner_name}
-            onChangeText={(v) => onChangeDraft({ owner_name: v })}
-            placeholder="VD: Chị Liên"
+            style={styles.wfInput}
+            keyboardType="decimal-pad"
+            value={draft.width ? String(draft.width) : ""}
+            onChangeText={(v) => onChangeDraft({ width: parseNumberInput(v) })}
+            placeholder="0 m"
           />
-        </Field>
-        <Field label="Di động (*)">
+        </WfRow>
+        <WfRow label="Dài KV">
           <TextInput
-            style={[styles.input, phoneDup && styles.inputDuplicate]}
-            keyboardType="phone-pad"
-            value={draft.contact_phone}
-            onChangeText={(v) => onChangeDraft({ contact_phone: v })}
-            placeholder="0911.380.022"
+            style={styles.wfInput}
+            keyboardType="decimal-pad"
+            value={draft.length ? String(draft.length) : ""}
+            onChangeText={(v) => onChangeDraft({ length: parseNumberInput(v) })}
+            placeholder="0 m"
           />
-          {phoneCheck.checking ? (
-            <View style={styles.lsPhoneStatusRow}>
-              <ActivityIndicator size="small" color="#6B7FA3" />
-              <Text style={styles.lsPhoneChecking}>Đang kiểm tra số...</Text>
-            </View>
-          ) : phoneDup ? (
-            <View>
-              <Text style={styles.lsPhoneDupWarn}>⚠ Số di động đã có trong hệ thống</Text>
-              {phoneCheck.ownerName ? (
-                <Pressable
-                  onPress={() => onChangeDraft({ owner_name: phoneCheck.ownerName ?? "" })}
-                  style={styles.lsPhoneOwnerRow}
-                >
-                  <Feather name="user" size={13} color="#15428B" />
-                  <Text style={styles.lsPhoneOwner}>
-                    Chủ nhà: {phoneCheck.ownerName} — chạm để điền tên
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : phoneChecked ? (
-            <Text style={styles.lsPhoneOk}>✓ Số mới — chưa có trong hệ thống</Text>
-          ) : null}
-        </Field>
-      </Section>
+        </WfRow>
+        <WfRow label="Nở hậu KV">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="decimal-pad"
+            value={draft.back_width ? String(draft.back_width) : ""}
+            onChangeText={(v) => onChangeDraft({ back_width: parseNumberInput(v) })}
+            placeholder="0"
+          />
+        </WfRow>
+        <WfRow label="Đường rộng">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="decimal-pad"
+            value={draft.road_width ? String(draft.road_width) : ""}
+            onChangeText={(v) => onChangeDraft({ road_width: parseNumberInput(v) })}
+            placeholder="m"
+          />
+        </WfRow>
+        <WfRow label=" ">
+          <View style={styles.wfCheckRow}>
+            <WfCheck label="Hầm" checked={!!draft.has_basement} onToggle={() => onChangeDraft({ has_basement: !draft.has_basement })} />
+            <WfCheck label="Lửng" checked={!!draft.has_mezzanine} onToggle={() => onChangeDraft({ has_mezzanine: !draft.has_mezzanine })} />
+            <WfCheck label="Sân thượng" checked={!!draft.has_terrace} onToggle={() => onChangeDraft({ has_terrace: !draft.has_terrace })} />
+          </View>
+        </WfRow>
+        <WfRow label=" ">
+          <View style={styles.wfCheckRow}>
+            <WfCheck label="Chính chủ" checked={!!draft.direct_owner} onToggle={() => onChangeDraft({ direct_owner: !draft.direct_owner })} />
+            <WfCheck label="Thương lượng" checked={!!draft.negotiable} onToggle={() => onChangeDraft({ negotiable: !draft.negotiable })} />
+          </View>
+        </WfRow>
+      </View>
 
-      {/* Tieu de & dien giai */}
-      <Section title="Tiêu đề & diễn giải">
-        <Field label="Tiêu đề (tự tạo nếu bỏ trống)">
+      {/* ===== TIEU DE & DIEN GIAI ===== */}
+      <View style={styles.wfGroup}>
+        <WfRow label="Tiêu đề">
           <TextInput
-            style={styles.input}
+            style={styles.wfInput}
             value={draft.title}
             onChangeText={(v) => onChangeDraft({ title: v })}
-            placeholder="VD: Nhà mặt tiền Nguyễn Trãi Q.5"
+            placeholder="Tự tạo nếu bỏ trống"
           />
-        </Field>
-        <Field label="Diễn giải">
+        </WfRow>
+        <WfRow label="Diễn giải">
           <TextInput
-            style={[styles.input, styles.textArea]}
+            style={[styles.wfInput, styles.textArea]}
             multiline
             value={draft.description ?? ""}
             onChangeText={(v) => onChangeDraft({ description: v })}
-            placeholder="Mô tả chi tiết căn nhà..."
           />
-        </Field>
-        <Field label="Ghi chú ban đầu">
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            multiline
-            value={draft.note ?? ""}
-            onChangeText={(v) => onChangeDraft({ note: v })}
-            placeholder="Ghi chú nội bộ khi nhập nhà"
-          />
-        </Field>
-      </Section>
+        </WfRow>
+      </View>
 
-      <View style={styles.submitPanel}>
+      <View style={styles.wfBtnRow}>
         <Pressable
-          style={[styles.primaryButton, submitting && styles.buttonDisabled]}
+          style={[styles.wfBtn, styles.wfBtnPrimary, submitting && styles.buttonDisabled]}
           disabled={submitting}
           onPress={() => void submit()}
         >
-          <Feather name="send" size={16} color="#fff" />
-          <Text style={styles.primaryButtonText}>{submitting ? "Đang gửi..." : "Lưu vào HomeApp"}</Text>
+          <Feather name="save" size={16} color="#1F3B70" />
+          <Text style={styles.wfBtnText}>{submitting ? "Đang lưu..." : "Lưu"}</Text>
         </Pressable>
-        <Text style={styles.submitPanelDescription}>Trạng thái mặc định: Chờ duyệt</Text>
+        <Pressable
+          style={styles.wfBtn}
+          onPress={() =>
+            Alert.alert("Hoãn nhập", "Xóa toàn bộ dữ liệu đang nhập trên form?", [
+              { text: "Không", style: "cancel" },
+              {
+                text: "Xóa",
+                style: "destructive",
+                onPress: () => onChangeDraft({ ...chototFieldDefaults, brokerage_percent: 1 }),
+              },
+            ])
+          }
+        >
+          <Feather name="rotate-ccw" size={16} color="#1F3B70" />
+          <Text style={styles.wfBtnText}>Hoãn</Text>
+        </Pressable>
       </View>
+      <Text style={styles.submitPanelDescription}>
+        Trạng thái mặc định: Chờ duyệt · Số ĐK và Tiêu đề tự sinh khi lưu
+      </Text>
+
+      {/* Chon tin khi clipboard chua nhieu tin Cho Tot */}
+      <Modal
+        visible={listingOptions !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setListingOptions(null)}
+      >
+        <View style={styles.chototPickerBackdrop}>
+          <View style={styles.chototPickerSheet}>
+            <View style={styles.chototPickerHeader}>
+              <Feather name="list" size={18} color="#17305D" />
+              <Text style={styles.chototPickerTitle}>
+                Chọn tin để điền ({listingOptions?.length ?? 0} tin)
+              </Text>
+            </View>
+            <ScrollView style={styles.chototPickerList}>
+              {(listingOptions ?? []).map((option, index) => (
+                <Pressable
+                  key={`${option.title}-${index}`}
+                  style={({ pressed }) => [
+                    styles.chototPickerItem,
+                    pressed && styles.chototPickerItemPressed,
+                  ]}
+                  onPress={() => applyListing(option)}
+                >
+                  <Text style={styles.chototPickerItemTitle} numberOfLines={2}>
+                    {option.title}
+                  </Text>
+                  {option.subtitle ? (
+                    <Text style={styles.chototPickerItemSub} numberOfLines={1}>
+                      {option.subtitle}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable style={styles.chototPickerCancel} onPress={() => setListingOptions(null)}>
+              <Text style={styles.chototPickerCancelText}>Đóng</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }

@@ -4,6 +4,10 @@ import {
   ActivityItem,
   CallLogEmployee,
   CurrentUser,
+  CustomerDetail,
+  PagedCustomersResponse,
+  PagedEmployeesResponse,
+  PropertyHistoryItem,
   LoginPayload,
   LoginResponse,
   LookupCollections,
@@ -312,4 +316,39 @@ export async function registerPushToken(
     },
     token
   );
+}
+
+export async function fetchCustomers(
+  token: string,
+  keyword = "",
+  page = 1,
+  pageSize = 30
+): Promise<PagedCustomersResponse> {
+  const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (keyword.trim()) query.append("keyword", keyword.trim());
+  return request<PagedCustomersResponse>(`/customers?${query.toString()}`, {}, token);
+}
+
+export async function fetchCustomerDetail(token: string, makh: number): Promise<CustomerDetail> {
+  return request<CustomerDetail>(`/customers/${makh}`, {}, token);
+}
+
+export async function fetchEmployees(
+  token: string,
+  keyword = "",
+  page = 1,
+  pageSize = 50
+): Promise<PagedEmployeesResponse> {
+  const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (keyword.trim()) query.append("keyword", keyword.trim());
+  return request<PagedEmployeesResponse>(`/employees?${query.toString()}`, {}, token);
+}
+
+export async function fetchPropertyHistory(token: string, landsoftId: number): Promise<PropertyHistoryItem[]> {
+  return request<PropertyHistoryItem[]>(`/properties/${landsoftId}/history`, {}, token);
+}
+
+export async function fetchNextPropertyCode(token: string): Promise<number> {
+  const res = await request<{ next_code: number }>("/next-property-code", {}, token);
+  return res.next_code;
 }

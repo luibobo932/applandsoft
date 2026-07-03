@@ -6,7 +6,15 @@ import { styles } from "../styles";
 import { cleanDisplayText, getInitials } from "../utils";
 import { CurrentUser, LookupItem } from "../types";
 
-export type LandsoftView = "workspace" | "properties" | "create" | "activity" | "callLogs";
+export type LandsoftView =
+  | "workspace"
+  | "properties"
+  | "create"
+  | "activity"
+  | "callLogs"
+  | "customers"
+  | "employees"
+  | "kingland";
 
 export function AppHeader({
   user,
@@ -54,7 +62,9 @@ export function LandsoftNavBar({
 }) {
   const tabs: Array<{ key: LandsoftView; label: string; icon: React.ComponentProps<typeof Feather>["name"] }> = [
     { key: "workspace", label: "HomeApp", icon: "grid" },
+    { key: "kingland", label: "King Land", icon: "monitor" },
     { key: "properties", label: "Kho hàng", icon: "home" },
+    { key: "create", label: "Nhập nhà", icon: "plus-circle" },
     { key: "callLogs", label: "Gọi SĐT", icon: "phone-call" },
     { key: "activity", label: "Gần đây", icon: "clock" },
   ];

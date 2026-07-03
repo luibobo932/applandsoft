@@ -26,9 +26,10 @@ import {
 import {
   addPropertyNote,
   fetchPropertyDetail,
+  fetchPropertyHistory,
   updatePropertyStatus,
 } from "../api";
-import { LookupCollections, PropertyDetail } from "../types";
+import { LookupCollections, PropertyDetail, PropertyHistoryItem } from "../types";
 
 export function PropertyDetailScreen({
   token,
@@ -65,6 +66,22 @@ export function PropertyDetailScreen({
   useEffect(() => {
     void loadDetail();
   }, [loadDetail]);
+
+  // Lich su thay doi cua can (mglbcLichSu) — ai lam gi, luc nao
+  const [history, setHistory] = useState<PropertyHistoryItem[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchPropertyHistory(token, propertyId)
+      .then((items) => {
+        if (!cancelled) setHistory(items);
+      })
+      .catch(() => {
+        if (!cancelled) setHistory([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [propertyId, token]);
 
   const copySummary = async () => {
     if (!property) {
@@ -311,6 +328,24 @@ export function PropertyDetailScreen({
             {submitting ? "Đang cập nhật..." : "Cập nhật trạng thái"}
           </Text>
         </Pressable>
+      </Section>
+
+      <Section title={`Lịch sử căn (${history.length})`}>
+        {history.length === 0 ? (
+          <Text style={styles.emptyStateText}>Chưa có lịch sử.</Text>
+        ) : (
+          <View style={styles.notesGroup}>
+            {history.map((item) => (
+              <View key={item.history_id} style={styles.noteRow}>
+                <Text style={styles.noteMeta}>
+                  {cleanDisplayText(item.staff_name ?? "", "Landsoft")} • {item.created_at ?? ""}
+                  {item.status_name ? ` • ${item.status_name}` : ""}
+                </Text>
+                <Text style={styles.noteContent}>{cleanDisplayText(item.content ?? "")}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </Section>
 
       <Section title="Ghi chú">

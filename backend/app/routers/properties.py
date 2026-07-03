@@ -10,6 +10,7 @@ from app.schemas.properties import (
     PropertyNoteCreate,
     PropertyStatusPatch,
 )
+from app.schemas.employees import PropertyHistoryItem
 from app.services.audit import log_action
 from app.services.landsoft import current_user, property_or_404
 
@@ -107,3 +108,13 @@ def create_property(payload: PropertyCreateRequest, user=Depends(current_user)) 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     log_action(user, "create_property", "property", payload.model_dump(), result)
     return ActionResponse(message=result["message"], landsoft_id=result["landsoft_id"])
+
+
+@router.get("/properties/{landsoft_id}/history", response_model=list[PropertyHistoryItem])
+def property_history(landsoft_id: int, _user=Depends(current_user)) -> list[PropertyHistoryItem]:
+    return [PropertyHistoryItem(**item) for item in get_gateway().list_property_history(landsoft_id)]
+
+
+@router.get("/next-property-code")
+def next_property_code(_user=Depends(current_user)) -> dict:
+    return {"next_code": get_gateway().get_next_property_code()}

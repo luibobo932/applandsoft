@@ -213,6 +213,77 @@ class StubLandsoftGateway:
     def list_streets(self, district_code: str, keyword: str | None = None) -> list[dict]:
         return []
 
+    def list_customers(self, keyword: str | None, page: int, page_size: int) -> tuple[list[dict], int]:
+        customers = [
+            {
+                "makh": 1001,
+                "full_name": "Chị Liên",
+                "phone": "0911380022",
+                "address": "172 Nguyễn Trãi",
+                "registered_at": "2026-06-01 09:00:00",
+                "staff_name": "Duy skl",
+                "property_count": 2,
+            },
+            {
+                "makh": 1002,
+                "full_name": "Anh Tùng",
+                "phone": "0903123456",
+                "address": "88 Trần Hưng Đạo",
+                "registered_at": "2026-06-15 14:30:00",
+                "staff_name": "Duy skl",
+                "property_count": 1,
+            },
+        ]
+        needle = (keyword or "").strip().casefold()
+        if needle:
+            customers = [
+                item for item in customers
+                if needle in item["full_name"].casefold() or needle in (item.get("phone") or "")
+            ]
+        return customers, len(customers)
+
+    def get_customer(self, makh: int) -> dict | None:
+        items, _ = self.list_customers(None, 1, 50)
+        found = next((item for item in items if item["makh"] == makh), None)
+        if not found:
+            return None
+        return {
+            **found,
+            "email": None,
+            "note_text": None,
+            "notes": [],
+            "properties": [
+                {
+                    "landsoft_id": 501,
+                    "title": "Nhà mẫu stub",
+                    "address": "172 Nguyễn Trãi",
+                    "district_name": "Q.5",
+                    "price": 5_200_000_000.0,
+                    "area": 52.0,
+                    "status_name": "Chờ duyệt",
+                    "created_at": "2026-06-20 10:00:00",
+                },
+            ],
+        }
+
+    def list_employees(self, keyword: str | None, page: int, page_size: int) -> tuple[list[dict], int]:
+        employees = [
+            {"manv": 2, "code": "SKL-001", "full_name": "Duy skl", "phone": "0900000001", "email": None, "department": "Kinh doanh", "role_name": "Chuyên viên", "locked": False},
+            {"manv": 130, "code": "SKL-130", "full_name": "Danh Văn Dương", "phone": "0900000002", "email": None, "department": "Kinh doanh", "role_name": "Chuyên viên", "locked": False},
+        ]
+        needle = (keyword or "").strip().casefold()
+        if needle:
+            employees = [e for e in employees if needle in e["full_name"].casefold() or needle in (e["code"] or "").casefold()]
+        return employees, len(employees)
+
+    def get_next_property_code(self) -> int:
+        return self.next_property_id
+
+    def list_property_history(self, landsoft_id: int) -> list[dict]:
+        return [
+            {"history_id": 1, "created_at": "2026-07-01 09:00:00", "content": "Thêm sản phẩm", "status_name": "Chờ duyệt", "staff_name": "Duy skl"},
+        ]
+
     def list_call_log_employees(self, keyword: str | None = None, limit: int = 300) -> list[dict]:
         employees = [
             {"employee_id": 46, "employee_code": "SKL-038", "employee_name": "Hồ Chí Cường", "today_call_count": 2, "latest_call_at": datetime.now(UTC)},
