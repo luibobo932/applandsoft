@@ -380,7 +380,8 @@ export function parseChototListing(
   if (phoneMatch) {
     const digits = phoneMatch[1].replace(/\D/g, "");
     if (/^0\d{9,10}$/.test(digits)) {
-      patch.contact_phone = digits;
+      // Giu nguyen format nhu trong tin (ke ca dau cham) — giong Landsoft luu SDT
+      patch.contact_phone = phoneMatch[1].trim();
       filled.push("SĐT");
     }
   }

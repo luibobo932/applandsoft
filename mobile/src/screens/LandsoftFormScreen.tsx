@@ -308,10 +308,7 @@ export function LandsoftFormScreen({
       (s.label ?? "").toLowerCase().includes("duy")
     );
     finalDraft.status_code = choDuyet?.code ?? lookups.statuses[0]?.code ?? "2";
-    if (!finalDraft.title?.trim()) {
-      const district = lookups.districts.find((d) => d.code === finalDraft.district_code)?.label;
-      finalDraft.title = [finalDraft.address, district].filter(Boolean).join(", ");
-    }
+    // Tieu de de trong neu nguoi dung khong go — giong het Landsoft desktop
     setSubmitting(true);
     try {
       const result = await createProperty(token, finalDraft);

@@ -922,6 +922,13 @@ class SqlLandsoftGateway:
                     existing = cursor.fetchone()
                     if existing:
                         customer_id = int(existing[0])
+                        # Giu dung format SDT nguoi dung vua go (dau cham...) nhu Landsoft
+                        typed_phone = (payload.get("contact_phone") or "").strip()
+                        if typed_phone:
+                            cursor.execute(
+                                "UPDATE dbo.KhachHang SET DiDong = ? WHERE MaKH = ?",
+                                typed_phone, customer_id,
+                            )
                 if customer_id is None:
                     cursor.execute(
                         """
@@ -995,8 +1002,8 @@ class SqlLandsoftGateway:
                     int(payload.get("floors") or 0),
                     description,
                     house_number,
-                    address_text,
-                    address_text,
+                    None,
+                    None,
                     int(payload["district_code"]),
                     ty_le_mg,
                     phi_mg,
@@ -1011,12 +1018,12 @@ class SqlLandsoftGateway:
                     int(payload["source_code"]),
                     1 if payload.get("negotiable") else 0,
                     1 if payload.get("direct_owner") else 0,
-                    payload.get("contact_phone") or "",
+                    "",
                     street_id,
                     int(payload["ward_code"]),
                     "mobile-app",
-                    payload["title"].strip(),
-                    description,
+                    (payload.get("title") or "").strip(),
+                    None,
                     1 if payload.get("has_basement") else 0,
                     1 if payload.get("has_mezzanine") else 0,
                     1 if payload.get("has_terrace") else 0,
@@ -1025,6 +1032,16 @@ class SqlLandsoftGateway:
                 if not property_row:
                     raise RuntimeError("Không tạo được căn mới trong Landsoft.")
                 landsoft_id = int(property_row[0])
+
+                # Lich su thuc hien: Landsoft luon ghi dong "Thêm sản phẩm" khi tao can
+                cursor.execute(
+                    """
+                    INSERT INTO dbo.mglbcLichSu (MaBC, NgayTH, MaTT, DienGiai, MaNV)
+                    VALUES (?, GETDATE(), NULL, N'Thêm sản phẩm', ?)
+                    """,
+                    landsoft_id,
+                    actor.landsoft_user_id,
+                )
 
                 if note:
                     cursor.execute(
