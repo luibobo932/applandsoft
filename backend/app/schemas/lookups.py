@@ -16,4 +16,5 @@ class LookupsResponse(BaseModel):
     statuses: list[LookupItem]
     sources: list[LookupItem]
     grades: list[LookupItem] = []
+    provinces: list[LookupItem] = []
     road_types: list[LookupItem] = []

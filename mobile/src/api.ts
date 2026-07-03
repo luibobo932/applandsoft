@@ -356,9 +356,11 @@ export async function fetchNextPropertyCode(token: string): Promise<number> {
 export async function checkHouseNumber(
   token: string,
   houseNumber: string,
-  district?: string
+  district?: string,
+  street?: string
 ): Promise<{ count: number; sample?: string | null }> {
   const query = new URLSearchParams({ house_number: houseNumber });
   if (district) query.append("district", district);
+  if (street) query.append("street", street);
   return request<{ count: number; sample?: string | null }>(`/check-house?${query.toString()}`, {}, token);
 }

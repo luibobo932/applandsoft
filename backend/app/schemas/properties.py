@@ -128,6 +128,7 @@ class PropertyCreateRequest(BaseModel):
     original_price: float | None = None
     brokerage_percent: float | None = None
     road_type_code: str | None = None
+    province_code: str | None = None
     back_width: float | None = None
     has_basement: bool = False
     has_mezzanine: bool = False

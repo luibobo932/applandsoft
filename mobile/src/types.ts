@@ -36,6 +36,7 @@ export type LookupCollections = {
   sources: LookupItem[];
   grades: LookupItem[];
   road_types: LookupItem[];
+  provinces: LookupItem[];
 };
 
 export type PropertySummary = {
@@ -154,6 +155,7 @@ export type PropertyCreatePayload = {
   original_price?: number;
   brokerage_percent?: number;
   road_type_code?: string;
+  province_code?: string;
   back_width?: number;
   has_basement?: boolean;
   has_mezzanine?: boolean;

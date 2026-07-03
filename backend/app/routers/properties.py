@@ -121,5 +121,7 @@ def next_property_code(_user=Depends(current_user)) -> dict:
 
 
 @router.get("/check-house")
-def check_house(house_number: str, district: str | None = None, _user=Depends(current_user)) -> dict:
-    return get_gateway().check_house_number(house_number, district)
+def check_house(
+    house_number: str, district: str | None = None, street: str | None = None, _user=Depends(current_user)
+) -> dict:
+    return get_gateway().check_house_number(house_number, district, street)

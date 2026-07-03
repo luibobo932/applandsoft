@@ -353,7 +353,9 @@ class SqlLandsoftGateway:
             cursor.execute("SELECT ISNULL(MAX(MaBC), 0) + 1 FROM dbo.mglbcBanChoThue")
             return int(cursor.fetchone()[0])
 
-    def check_house_number(self, house_number: str, district_code: str | None = None) -> dict:
+    def check_house_number(
+        self, house_number: str, district_code: str | None = None, street_name: str | None = None
+    ) -> dict:
         """So nha da co trong kho chua — de form to do nhu logic SDT trung."""
         house = (house_number or "").strip()
         if not house:
@@ -363,6 +365,10 @@ class SqlLandsoftGateway:
         if district_code and str(district_code).isdigit():
             where += " AND bc.MaHuyen = ?"
             params.append(int(district_code))
+        street = (street_name or "").strip()
+        if street:
+            where += " AND LTRIM(RTRIM(COALESCE(s.Names, N''))) = ?"
+            params.append(street)
         with open_sql_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -667,19 +673,19 @@ class SqlLandsoftGateway:
             cursor = conn.cursor()
 
             queries = {
+                "provinces": """
+                    SELECT CAST(MaTinh AS nvarchar(20)) AS code, TenTinh AS label
+                    FROM dbo.Tinh
+                    WHERE LTRIM(RTRIM(COALESCE(TenTinh, N''))) <> N''
+                    ORDER BY CASE WHEN MaTinh = 3 THEN 0 ELSE 1 END, TenTinh
+                """,
                 "districts": """
-                    SELECT code, label
-                    FROM (
-                        SELECT DISTINCT
-                            CAST(h.MaHuyen AS nvarchar(20)) AS code,
-                            h.TenHuyen AS label
-                        FROM dbo.mglbcBanChoThue bc
-                        INNER JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
-                        WHERE bc.MaHuyen IS NOT NULL
-                          AND h.TenHuyen IS NOT NULL
-                          AND LTRIM(RTRIM(h.TenHuyen)) <> N''
-                    ) AS q
-                    ORDER BY q.label
+                    SELECT CAST(h.MaHuyen AS nvarchar(20)) AS code,
+                           h.TenHuyen AS label,
+                           CAST(h.MaTinh AS nvarchar(20)) AS parent_code
+                    FROM dbo.Huyen h
+                    WHERE LTRIM(RTRIM(COALESCE(h.TenHuyen, N''))) <> N''
+                    ORDER BY h.STT, h.TenHuyen
                 """,
                 "wards": """
                     SELECT code, label, parent_code
@@ -962,7 +968,7 @@ class SqlLandsoftGateway:
                         HoKH, TenKH, DiDong, DiDong2, Email, DiaChi, MaXa, MaHuyen, MaTinh, MaNV, IsPersonal, NgayDangKy
                     )
                     OUTPUT inserted.MaKH INTO @t(MaKH)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1, GETDATE());
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, GETDATE());
                     SELECT TOP 1 MaKH FROM @t;
                     """,
                         owner_first_name,
@@ -973,6 +979,7 @@ class SqlLandsoftGateway:
                         (payload.get("owner_address") or address_text),
                         int(payload["ward_code"]),
                         int(payload["district_code"]),
+                        int(payload.get("province_code") or 3),
                         actor.landsoft_user_id,
                     )
                     customer_row = self._fetch_first_result(cursor)

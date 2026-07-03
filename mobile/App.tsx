@@ -96,6 +96,7 @@ const emptyLookups: LookupCollections = {
   sources: [],
   grades: [],
   road_types: [],
+  provinces: [],
 };
 
 const emptyFilters: PropertyFilters = {
