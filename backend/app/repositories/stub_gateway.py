@@ -276,6 +276,9 @@ class StubLandsoftGateway:
             employees = [e for e in employees if needle in e["full_name"].casefold() or needle in (e["code"] or "").casefold()]
         return employees, len(employees)
 
+    def check_house_number(self, house_number: str, district_code: str | None = None) -> dict:
+        return {"count": 0, "sample": None}
+
     def get_next_property_code(self) -> int:
         return self.next_property_id
 

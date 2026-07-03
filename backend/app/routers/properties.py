@@ -118,3 +118,8 @@ def property_history(landsoft_id: int, _user=Depends(current_user)) -> list[Prop
 @router.get("/next-property-code")
 def next_property_code(_user=Depends(current_user)) -> dict:
     return {"next_code": get_gateway().get_next_property_code()}
+
+
+@router.get("/check-house")
+def check_house(house_number: str, district: str | None = None, _user=Depends(current_user)) -> dict:
+    return get_gateway().check_house_number(house_number, district)

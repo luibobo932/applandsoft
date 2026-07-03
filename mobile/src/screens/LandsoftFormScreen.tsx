@@ -8,7 +8,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, TextInput
 import { Field, Section, SelectField } from "../components/shared";
 import { styles } from "../styles";
 import { normalizeApiError, parseNumberInput } from "../utils";
-import { checkPhone, cleanPhoneCompare, createProperty, fetchNextPropertyCode, fetchStreets } from "../api";
+import { checkHouseNumber, checkPhone, cleanPhoneCompare, createProperty, fetchNextPropertyCode, fetchStreets } from "../api";
 import {
   ChototListingOption,
   chototFieldDefaults,
@@ -163,6 +163,57 @@ export function LandsoftFormScreen({
       cancelled = true;
     };
   }, [token]);
+
+  // Mac dinh theo quy trinh: Cap do = Hang Hot, Nguon = Khao sat thuc te, Phap ly = So hong
+  useEffect(() => {
+    const patch: Partial<PropertyCreatePayload> = {};
+    if (!draft.grade_code && lookups.grades.length > 0) {
+      const hot = lookups.grades.find((g) => stripAccents(g.label).includes("hang hot"));
+      if (hot) patch.grade_code = hot.code;
+    }
+    if (!draft.source_code && lookups.sources.length > 0) {
+      const ks = lookups.sources.find((x) => stripAccents(x.label).includes("khao sat"));
+      if (ks) patch.source_code = ks.code;
+    }
+    if (!draft.legal_status_code && lookups.legal_statuses.length > 0) {
+      const sh = lookups.legal_statuses.find((x) => stripAccents(x.label).includes("so hong"));
+      if (sh) patch.legal_status_code = sh.code;
+    }
+    if (Object.keys(patch).length > 0) onChangeDraft(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookups, draft.grade_code, draft.source_code, draft.legal_status_code]);
+
+  // So nha trung -> to do (nhu logic SDT chu nha)
+  const [houseCheck, setHouseCheck] = useState<{
+    checking: boolean;
+    count: number;
+    sample: string;
+    checked: string;
+  }>({ checking: false, count: 0, sample: "", checked: "" });
+  useEffect(() => {
+    const house = (draft.address ?? "").trim();
+    if (!house) {
+      setHouseCheck({ checking: false, count: 0, sample: "", checked: "" });
+      return;
+    }
+    let cancelled = false;
+    setHouseCheck((prev) => ({ ...prev, checking: true }));
+    const timer = setTimeout(() => {
+      checkHouseNumber(token, house, draft.district_code || undefined)
+        .then((res) => {
+          if (!cancelled)
+            setHouseCheck({ checking: false, count: res.count, sample: res.sample ?? "", checked: house });
+        })
+        .catch(() => {
+          if (!cancelled) setHouseCheck({ checking: false, count: 0, sample: "", checked: house });
+        });
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [draft.address, draft.district_code, token]);
+  const houseDup = houseCheck.count > 0 && houseCheck.checked === (draft.address ?? "").trim();
 
   const wardOptions = lookups.wards.filter(
     (item) => !draft.district_code || item.parent_code === draft.district_code
@@ -339,7 +390,7 @@ export function LandsoftFormScreen({
         Copy nhiều tin cùng lúc sẽ hiện danh sách để chọn.
       </Text>
 
-      {/* ===== KHACH HANG (tab dau cua Landsoft) ===== */}
+      {/* ===== KHACH HANG: chi Ho ten + Di dong theo yeu cau ===== */}
       <View style={styles.wfGroup}>
         <Text style={styles.wfGroupTitle}>Khách hàng</Text>
         <WfRow label="Họ tên (*)">
@@ -353,8 +404,6 @@ export function LandsoftFormScreen({
           <TextInput
             style={[
               styles.wfInput,
-              // Giong Landsoft: to hong khi con trong (bat buoc) hoac khi SDT trung;
-              // so moi hop le -> nen trang
               (!draft.contact_phone?.trim() || phoneDup) && styles.wfInputRequiredPhone,
             ]}
             keyboardType="phone-pad"
@@ -373,63 +422,16 @@ export function LandsoftFormScreen({
         ) : phoneChecked ? (
           <Text style={styles.lsPhoneOk}>✓ Số mới — chưa có trong hệ thống</Text>
         ) : null}
-        <WfRow label="Email">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            value={draft.owner_email ?? ""}
-            onChangeText={(v) => onChangeDraft({ owner_email: v })}
-          />
-        </WfRow>
-        <WfRow label="Điện thoại">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="phone-pad"
-            value={draft.owner_phone2 ?? ""}
-            onChangeText={(v) => onChangeDraft({ owner_phone2: v })}
-          />
-        </WfRow>
-        <WfRow label="Địa chỉ">
-          <TextInput
-            style={styles.wfInput}
-            value={draft.owner_address ?? ""}
-            onChangeText={(v) => onChangeDraft({ owner_address: v })}
-          />
-        </WfRow>
-        <WfRow label="Khu vực">
-          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="Theo quận đã chọn" editable={false} />
-        </WfRow>
       </View>
 
-      {/* ===== THONG TIN CO BAN (thu tu doc tung hang cua Landsoft) ===== */}
+      {/* ===== THONG TIN CO BAN: dung thu tu anh Landsoft ===== */}
       <View style={styles.wfGroup}>
         <Text style={styles.wfGroupTitle}>Thông tin cơ bản</Text>
         <WfRow label="Số ĐK (*)">
           <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value={nextCode ? String(nextCode) : "Tự sinh"} editable={false} />
         </WfRow>
         <WfRow label="Tỉnh (TP)">
-          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="Hồ Chí Minh" editable={false} />
-        </WfRow>
-        <WfRow label="Diện tích">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="decimal-pad"
-            value={draft.area ? String(draft.area) : ""}
-            onChangeText={(v) => onChangeDraft({ area: parseNumberInput(v) })}
-            placeholder="m²"
-          />
-        </WfRow>
-        <WfRow label="Phí môi giới">
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <TextInput
-              style={[styles.wfInput, { flex: 1 }]}
-              keyboardType="decimal-pad"
-              value={String(draft.brokerage_percent ?? 1)}
-              onChangeText={(v) => onChangeDraft({ brokerage_percent: parseNumberInput(v) })}
-            />
-            <Text style={styles.wfRadioText}>%</Text>
-          </View>
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="TP Hồ Chí Minh" editable={false} />
         </WfRow>
         <WfRow label="Nhu cầu">
           <View style={styles.wfRadioRow}>
@@ -454,22 +456,6 @@ export function LandsoftFormScreen({
             onChange={(v) => onChangeDraft({ district_code: v, ward_code: "" })}
           />
         </WfRow>
-        <WfRow label="Đơn giá">
-          <TextInput
-            style={[styles.wfInput, styles.wfInputDisabled]}
-            value={draft.price > 0 && draft.area > 0 ? `${Math.round((draft.price * 1000) / draft.area)} triệu/m²` : "0"}
-            editable={false}
-          />
-        </WfRow>
-        <WfRow label="Giá gốc">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="decimal-pad"
-            value={draft.original_price ? String(draft.original_price) : ""}
-            onChangeText={(v) => onChangeDraft({ original_price: parseNumberInput(v) })}
-            placeholder="tỷ"
-          />
-        </WfRow>
         <WfRow label="Loại BĐS (*)">
           <WfSelect
             value={draft.property_type_code}
@@ -483,19 +469,6 @@ export function LandsoftFormScreen({
             items={wardOptions}
             onChange={(v) => onChangeDraft({ ward_code: v })}
           />
-        </WfRow>
-        <WfRow label="Giá bán">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="decimal-pad"
-            value={draft.price ? String(draft.price) : ""}
-            onChangeText={(v) => onChangeDraft({ price: parseNumberInput(v) })}
-            placeholder="tỷ"
-          />
-        </WfRow>
-        {giaQuyDoi ? <Text style={styles.wfHint}>{giaQuyDoi}</Text> : null}
-        <WfRow label="Chia sẻ">
-          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="Nội bộ" editable={false} />
         </WfRow>
         {lookups.grades.length > 0 ? (
           <WfRow label="Cấp độ (*)">
@@ -534,12 +507,6 @@ export function LandsoftFormScreen({
             ))}
           </View>
         ) : null}
-        <WfRow label="Loại tiền/ĐVT">
-          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="VNĐ" editable={false} />
-        </WfRow>
-        <WfRow label="Nhân viên">
-          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value={staffName || "Theo tài khoản đăng nhập"} editable={false} />
-        </WfRow>
         <WfRow label="Nguồn">
           <WfSelect
             value={draft.source_code}
@@ -549,33 +516,84 @@ export function LandsoftFormScreen({
         </WfRow>
         <WfRow label="Số nhà">
           <TextInput
-            style={styles.wfInput}
+            style={[styles.wfInput, houseDup && styles.wfInputRequiredPhone]}
             value={draft.address}
             onChangeText={(v) => onChangeDraft({ address: v })}
           />
         </WfRow>
+        {houseCheck.checking ? (
+          <Text style={styles.wfHint}>Đang kiểm tra số nhà...</Text>
+        ) : houseDup ? (
+          <Text style={styles.lsPhoneDupWarn}>
+            ⚠ Số nhà đã có trong kho ({houseCheck.count} căn): {houseCheck.sample}
+          </Text>
+        ) : null}
+        <WfRow label="Diện tích">
+          <TextInput
+            style={[styles.wfInput, styles.wfInputDisabled]}
+            value={draft.area ? `${draft.area} m²` : ""}
+            editable={false}
+            placeholder="= Ngang × Dài"
+          />
+        </WfRow>
+        <WfRow label="Đơn giá">
+          <TextInput
+            style={[styles.wfInput, styles.wfInputDisabled]}
+            value={draft.price > 0 && draft.area > 0 ? `${Math.round((draft.price * 1000) / draft.area)} triệu/m²` : "0"}
+            editable={false}
+          />
+        </WfRow>
+        <WfRow label="Giá bán">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="decimal-pad"
+            value={draft.price ? String(draft.price) : ""}
+            onChangeText={(v) => onChangeDraft({ price: parseNumberInput(v) })}
+            placeholder="tỷ"
+          />
+        </WfRow>
+        {giaQuyDoi ? <Text style={styles.wfHint}>{giaQuyDoi}</Text> : null}
+        <WfRow label="Giá gốc">
+          <TextInput
+            style={styles.wfInput}
+            keyboardType="decimal-pad"
+            value={draft.original_price ? String(draft.original_price) : ""}
+            onChangeText={(v) => onChangeDraft({ original_price: parseNumberInput(v) })}
+            placeholder="tỷ"
+          />
+        </WfRow>
+        <WfRow label="Phí môi giới">
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <TextInput
+              style={[styles.wfInput, { flex: 1 }]}
+              keyboardType="decimal-pad"
+              value={String(draft.brokerage_percent ?? 1)}
+              onChangeText={(v) => onChangeDraft({ brokerage_percent: parseNumberInput(v) })}
+            />
+            <Text style={styles.wfRadioText}>%</Text>
+          </View>
+        </WfRow>
+        <WfRow label="Chia sẻ">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="Nội bộ" editable={false} />
+        </WfRow>
+        <WfRow label="Loại tiền/ĐVT">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="VNĐ" editable={false} />
+        </WfRow>
+        <WfRow label="Nhân viên">
+          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value={staffName || "Theo tài khoản đăng nhập"} editable={false} />
+        </WfRow>
         {draft.negotiable ? <Text style={styles.wfThuongLuong}>Thương lượng</Text> : null}
       </View>
 
-      {/* ===== DAC DIEM VA TIEN ICH (thu tu doc tung hang cua Landsoft) ===== */}
+      {/* ===== DAC DIEM VA TIEN ICH: chi Phap ly / Loai duong / Ngang / Dai ===== */}
       <View style={styles.wfGroup}>
         <Text style={styles.wfGroupTitle}>Đặc điểm và tiện ích</Text>
-        <WfRow label="Hướng">
-          <WfSelect
-            value={draft.direction_code ?? ""}
-            items={lookups.directions}
-            onChange={(v) => onChangeDraft({ direction_code: v })}
-          />
-        </WfRow>
         <WfRow label="Pháp lý">
           <WfSelect
             value={draft.legal_status_code ?? ""}
             items={lookups.legal_statuses}
             onChange={(v) => onChangeDraft({ legal_status_code: v })}
           />
-        </WfRow>
-        <WfRow label="Tiện tích">
-          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="" editable={false} />
         </WfRow>
         {lookups.road_types.length > 0 ? (
           <WfRow label="Loại đường">
@@ -586,57 +604,17 @@ export function LandsoftFormScreen({
             />
           </WfRow>
         ) : null}
-        <WfRow label="P.Khách">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="number-pad"
-            value={draft.living_rooms ? String(draft.living_rooms) : ""}
-            onChangeText={(v) => onChangeDraft({ living_rooms: parseNumberInput(v) })}
-            placeholder="0"
-          />
-        </WfRow>
-        <WfRow label="P.Tắm">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="number-pad"
-            value={draft.bathrooms ? String(draft.bathrooms) : ""}
-            onChangeText={(v) => onChangeDraft({ bathrooms: parseNumberInput(v) })}
-            placeholder="0"
-          />
-        </WfRow>
-        <WfRow label="P.Ngủ">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="number-pad"
-            value={draft.bedrooms ? String(draft.bedrooms) : ""}
-            onChangeText={(v) => onChangeDraft({ bedrooms: parseNumberInput(v) })}
-            placeholder="0"
-          />
-        </WfRow>
-        <WfRow label="Số tầng">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="number-pad"
-            value={draft.floors ? String(draft.floors) : ""}
-            onChangeText={(v) => onChangeDraft({ floors: parseNumberInput(v) })}
-            placeholder="0"
-          />
-        </WfRow>
-        <WfRow label="Diện tích KV">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="decimal-pad"
-            value={draft.area ? String(draft.area) : ""}
-            onChangeText={(v) => onChangeDraft({ area: parseNumberInput(v) })}
-            placeholder="m²"
-          />
-        </WfRow>
         <WfRow label="Ngang KV">
           <TextInput
             style={styles.wfInput}
             keyboardType="decimal-pad"
             value={draft.width ? String(draft.width) : ""}
-            onChangeText={(v) => onChangeDraft({ width: parseNumberInput(v) })}
+            onChangeText={(v) => {
+              const width = parseNumberInput(v);
+              // Dien tich = Ngang x Dai (tu tinh)
+              const area = width > 0 && (draft.length ?? 0) > 0 ? Math.round(width * (draft.length ?? 0) * 100) / 100 : draft.area;
+              onChangeDraft({ width, area });
+            }}
             placeholder="0 m"
           />
         </WfRow>
@@ -645,40 +623,13 @@ export function LandsoftFormScreen({
             style={styles.wfInput}
             keyboardType="decimal-pad"
             value={draft.length ? String(draft.length) : ""}
-            onChangeText={(v) => onChangeDraft({ length: parseNumberInput(v) })}
+            onChangeText={(v) => {
+              const length = parseNumberInput(v);
+              const area = length > 0 && (draft.width ?? 0) > 0 ? Math.round((draft.width ?? 0) * length * 100) / 100 : draft.area;
+              onChangeDraft({ length, area });
+            }}
             placeholder="0 m"
           />
-        </WfRow>
-        <WfRow label="Nở hậu KV">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="decimal-pad"
-            value={draft.back_width ? String(draft.back_width) : ""}
-            onChangeText={(v) => onChangeDraft({ back_width: parseNumberInput(v) })}
-            placeholder="0"
-          />
-        </WfRow>
-        <WfRow label="Đường rộng">
-          <TextInput
-            style={styles.wfInput}
-            keyboardType="decimal-pad"
-            value={draft.road_width ? String(draft.road_width) : ""}
-            onChangeText={(v) => onChangeDraft({ road_width: parseNumberInput(v) })}
-            placeholder="m"
-          />
-        </WfRow>
-        <WfRow label=" ">
-          <View style={styles.wfCheckRow}>
-            <WfCheck label="Hầm" checked={!!draft.has_basement} onToggle={() => onChangeDraft({ has_basement: !draft.has_basement })} />
-            <WfCheck label="Lửng" checked={!!draft.has_mezzanine} onToggle={() => onChangeDraft({ has_mezzanine: !draft.has_mezzanine })} />
-            <WfCheck label="Sân thượng" checked={!!draft.has_terrace} onToggle={() => onChangeDraft({ has_terrace: !draft.has_terrace })} />
-          </View>
-        </WfRow>
-        <WfRow label=" ">
-          <View style={styles.wfCheckRow}>
-            <WfCheck label="Chính chủ" checked={!!draft.direct_owner} onToggle={() => onChangeDraft({ direct_owner: !draft.direct_owner })} />
-            <WfCheck label="Thương lượng" checked={!!draft.negotiable} onToggle={() => onChangeDraft({ negotiable: !draft.negotiable })} />
-          </View>
         </WfRow>
       </View>
 

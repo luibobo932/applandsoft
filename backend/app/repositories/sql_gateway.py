@@ -353,6 +353,31 @@ class SqlLandsoftGateway:
             cursor.execute("SELECT ISNULL(MAX(MaBC), 0) + 1 FROM dbo.mglbcBanChoThue")
             return int(cursor.fetchone()[0])
 
+    def check_house_number(self, house_number: str, district_code: str | None = None) -> dict:
+        """So nha da co trong kho chua — de form to do nhu logic SDT trung."""
+        house = (house_number or "").strip()
+        if not house:
+            return {"count": 0, "sample": None}
+        where = "WHERE bc.KichHoat = 1 AND LTRIM(RTRIM(COALESCE(bc.SoNha, N''))) = ?"
+        params: list = [house]
+        if district_code and str(district_code).isdigit():
+            where += " AND bc.MaHuyen = ?"
+            params.append(int(district_code))
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT COUNT(*),
+                       MAX(LTRIM(RTRIM(COALESCE(bc.SoNha, N'') + N' ' + COALESCE(s.Names, N''))))
+                FROM dbo.mglbcBanChoThue bc
+                LEFT JOIN dbo.Street s ON s.ID = bc.StreetID
+                {where}
+                """,
+                params,
+            )
+            row = cursor.fetchone()
+            return {"count": int(row[0] or 0), "sample": row[1]}
+
     def list_customers(self, keyword: str | None, page: int, page_size: int) -> tuple[list[dict], int]:
         """Danh ba khach hang Landsoft: tim theo ten hoac SDT, phan trang."""
         page = max(int(page or 1), 1)
