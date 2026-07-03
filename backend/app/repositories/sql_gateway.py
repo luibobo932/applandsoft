@@ -305,7 +305,8 @@ class SqlLandsoftGateway:
         billions = total_million // 1000
         millions = total_million % 1000
         if billions > 0 and millions > 0:
-            return f"{billions} tỷ {millions} triệu"
+            # Landsoft desktop luu 2 dau cach: "17 tỷ  500 triệu"
+            return f"{billions} tỷ  {millions} triệu"
         if billions > 0:
             return f"{billions} tỷ"
         return f"{millions} triệu"
@@ -927,7 +928,8 @@ class SqlLandsoftGateway:
         street_id = self._resolve_street_id(payload["district_code"], payload.get("street_name"))
         total_price = self._price_to_vnd(float(payload["price"]))
         area = float(payload["area"])
-        don_gia = round(total_price / area, 4) if area > 0 else 0
+        # Desktop de DienTich=0 va DonGia=0 (chi dien DienTichKV) — lam y het
+        don_gia = 0
         owner_first_name, owner_last_name = self._split_owner_name(payload.get("owner_name"))
         is_sale = 0 if payload.get("listing_type") == "thue" else 1
         address_text = payload["address"].strip()
@@ -1022,7 +1024,7 @@ class SqlLandsoftGateway:
                     actor.landsoft_user_id,
                     is_sale,
                     int(payload["property_type_code"]),
-                    area,
+                    0,
                     don_gia,
                     total_price,
                     self._price_to_vnd(float(payload.get("original_price") or 0)),
@@ -1053,7 +1055,7 @@ class SqlLandsoftGateway:
                     "",
                     street_id,
                     int(payload["ward_code"]),
-                    "mobile-app",
+                    None,
                     (payload.get("title") or "").strip(),
                     None,
                     1 if payload.get("has_basement") else 0,
