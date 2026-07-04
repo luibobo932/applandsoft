@@ -15,7 +15,7 @@ import {
   registerUnauthorizedHandler,
 } from "./src/api";
 import { defaultApiBaseUrl, getApiBaseUrl, setApiBaseUrl } from "./src/config";
-import { AppHeader, LandsoftNavBar, LandsoftView } from "./src/components/shared";
+import { AppHeader, LandsoftDrawer, LandsoftView } from "./src/components/shared";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { PropertyListScreen } from "./src/screens/PropertyListScreen";
 import { PropertyDetailScreen } from "./src/screens/PropertyDetailScreen";
@@ -142,6 +142,7 @@ export default function App() {
   const [draft, setDraft] = useState<PropertyCreatePayload>(emptyDraft);
   const [savingDraft, setSavingDraft] = useState(false);
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(() => getPreferredApiBaseUrl());
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = useCallback(async () => {
     // Xoa ca creds da luu de khong tu dang nhap lai sau khi nguoi dung chu dong dang xuat
@@ -481,7 +482,7 @@ export default function App() {
     <SafeAreaView style={styles.appShell}>
       <StatusBar style="dark" />
       {!isPropertyDetailView && activeTab !== "kingland" ? (
-        <AppHeader user={session.user} title={title} onLogout={() => void handleLogout()} />
+        <AppHeader user={session.user} title={title} onLogout={() => void handleLogout()} onMenu={() => setMenuOpen(true)} />
       ) : null}
 
       {selectedPropertyId && activeTab === "properties" ? (
@@ -580,15 +581,21 @@ export default function App() {
         />
       ) : null}
 
-      {!isPropertyDetailView ? (
-        <LandsoftNavBar
-          activeTab={activeTab}
-          onChange={(tab) => {
-            setSelectedPropertyId(null);
-            setActiveTab(tab);
-          }}
-        />
-      ) : null}
+      <LandsoftDrawer
+        visible={menuOpen}
+        activeTab={activeTab}
+        user={session.user}
+        onChange={(tab) => {
+          setSelectedPropertyId(null);
+          setActiveTab(tab);
+          setMenuOpen(false);
+        }}
+        onClose={() => setMenuOpen(false)}
+        onLogout={() => {
+          setMenuOpen(false);
+          void handleLogout();
+        }}
+      />
     </SafeAreaView>
   );
 }

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import { Pressable, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 
 import { styles } from "../styles";
 import { cleanDisplayText, getInitials } from "../utils";
@@ -20,13 +20,20 @@ export function AppHeader({
   user,
   title,
   onLogout,
+  onMenu,
 }: {
   user: CurrentUser;
   title: string;
   onLogout: () => void;
+  onMenu?: () => void;
 }) {
   return (
     <View style={styles.header}>
+      {onMenu ? (
+        <Pressable style={styles.menuButton} onPress={onMenu}>
+          <Feather name="menu" size={22} color="#17305D" />
+        </Pressable>
+      ) : null}
       <View style={styles.headerTextGroup}>
         <Text style={styles.headerEyebrow}>{cleanDisplayText(user.role_name || "HomeApp")}</Text>
         <Text style={styles.headerTitle}>{title}</Text>
@@ -89,6 +96,67 @@ export function LandsoftNavBar({
         </Pressable>
       ))}
     </View>
+  );
+}
+
+// Menu 3 gach ben hong: cac chuc nang gom vao drawer truot ra
+export function LandsoftDrawer({
+  visible,
+  activeTab,
+  user,
+  onChange,
+  onClose,
+  onLogout,
+}: {
+  visible: boolean;
+  activeTab: LandsoftView;
+  user: CurrentUser;
+  onChange: (tab: LandsoftView) => void;
+  onClose: () => void;
+  onLogout: () => void;
+}) {
+  const items: Array<{ key: LandsoftView; label: string; icon: React.ComponentProps<typeof Feather>["name"] }> = [
+    { key: "workspace", label: "HomeApp", icon: "grid" },
+    { key: "kingland", label: "King Land", icon: "monitor" },
+    { key: "properties", label: "Kho hàng", icon: "home" },
+    { key: "create", label: "Nhập nhà", icon: "plus-circle" },
+    { key: "customers", label: "Khách hàng", icon: "users" },
+    { key: "employees", label: "Nhân viên", icon: "user-check" },
+    { key: "callLogs", label: "Theo dõi gọi SĐT", icon: "phone-call" },
+    { key: "activity", label: "Gần đây", icon: "clock" },
+  ];
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.drawerBackdrop}>
+        <View style={styles.drawerPanel}>
+          <View style={styles.drawerHeader}>
+            <Text style={styles.drawerBrand}>KING LAND · HOMEAPP</Text>
+            <Text style={styles.drawerUser}>{cleanDisplayText(user.display_name)}</Text>
+            <Text style={styles.drawerRole}>
+              {cleanDisplayText(user.role_name || "Môi giới")} · {cleanDisplayText(user.landsoft_username ?? user.username)}
+            </Text>
+          </View>
+          {items.map((item) => {
+            const active = activeTab === item.key;
+            return (
+              <Pressable
+                key={item.key}
+                style={[styles.drawerItem, active && styles.drawerItemActive]}
+                onPress={() => onChange(item.key)}
+              >
+                <Feather name={item.icon} size={19} color={active ? "#15428B" : "#5B6B85"} />
+                <Text style={[styles.drawerItemText, active && styles.drawerItemTextActive]}>{item.label}</Text>
+              </Pressable>
+            );
+          })}
+          <Pressable style={styles.drawerLogout} onPress={onLogout}>
+            <Feather name="log-out" size={19} color="#C0392B" />
+            <Text style={[styles.drawerItemText, { color: "#C0392B" }]}>Đăng xuất</Text>
+          </Pressable>
+        </View>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+      </View>
+    </Modal>
   );
 }
 
