@@ -2013,6 +2013,21 @@ export const styles = StyleSheet.create({
     backgroundColor: "#EDF1F9",
     marginRight: 10,
   },
+  headerCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    backgroundColor: "#ffffff",
+  },
+  headerCompactTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#17305D",
+  },
   drawerBackdrop: {
     flex: 1,
     flexDirection: "row",

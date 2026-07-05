@@ -3,7 +3,7 @@ import { Picker } from "@react-native-picker/picker";
 import { Modal, Pressable, Text, View } from "react-native";
 
 import { styles } from "../styles";
-import { cleanDisplayText, getInitials } from "../utils";
+import { cleanDisplayText } from "../utils";
 import { CurrentUser, LookupItem } from "../types";
 
 export type LandsoftView =
@@ -16,10 +16,10 @@ export type LandsoftView =
   | "employees"
   | "kingland";
 
+// Header gon: chi hamburger + tieu de. Thong tin user va nut Dang xuat da doi
+// vao menu 3 gach -> mo app la thay ngay danh sach nha, khong bi che tam nhin.
 export function AppHeader({
-  user,
   title,
-  onLogout,
   onMenu,
 }: {
   user: CurrentUser;
@@ -28,34 +28,15 @@ export function AppHeader({
   onMenu?: () => void;
 }) {
   return (
-    <View style={styles.header}>
+    <View style={styles.headerCompact}>
       {onMenu ? (
         <Pressable style={styles.menuButton} onPress={onMenu}>
           <Feather name="menu" size={22} color="#17305D" />
         </Pressable>
       ) : null}
-      <View style={styles.headerTextGroup}>
-        <Text style={styles.headerEyebrow}>{cleanDisplayText(user.role_name || "HomeApp")}</Text>
-        <Text style={styles.headerTitle}>{title}</Text>
-        <Text style={styles.headerSubtitle}>
-          {cleanDisplayText(user.display_name)} • {cleanDisplayText(user.landsoft_username ?? user.username)}
-        </Text>
-      </View>
-      <View style={styles.headerActions}>
-        <View style={styles.userPill}>
-          <View style={styles.userAvatar}>
-            <Text style={styles.userAvatarText}>{getInitials(user.display_name)}</Text>
-          </View>
-          <View style={styles.userPillTextGroup}>
-            <Text style={styles.userPillName}>{cleanDisplayText(user.landsoft_username ?? user.username)}</Text>
-            <Text style={styles.userPillRole}>{cleanDisplayText(user.role_name || "Môi giới")}</Text>
-          </View>
-        </View>
-        <Pressable style={styles.logoutPill} onPress={onLogout}>
-          <Feather name="log-out" size={14} color="#17305D" />
-          <Text style={styles.logoutPillText}>Đăng xuất</Text>
-        </Pressable>
-      </View>
+      <Text style={styles.headerCompactTitle} numberOfLines={1}>
+        {title}
+      </Text>
     </View>
   );
 }
@@ -120,10 +101,7 @@ export function LandsoftDrawer({
     { key: "kingland", label: "King Land", icon: "monitor" },
     { key: "properties", label: "Kho hàng", icon: "home" },
     { key: "create", label: "Nhập nhà", icon: "plus-circle" },
-    { key: "customers", label: "Khách hàng", icon: "users" },
-    { key: "employees", label: "Nhân viên", icon: "user-check" },
     { key: "callLogs", label: "Theo dõi gọi SĐT", icon: "phone-call" },
-    { key: "activity", label: "Gần đây", icon: "clock" },
   ];
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
