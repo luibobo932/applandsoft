@@ -2133,6 +2133,14 @@ export const styles = StyleSheet.create({
   wfInputRequiredPhone: {
     backgroundColor: "#FFD2D2",
   },
+  wfInputDone: {
+    backgroundColor: "#E9F7EC",
+    borderColor: "#8FCF9F",
+  },
+  wfPickerWrapDone: {
+    backgroundColor: "#E9F7EC",
+    borderColor: "#8FCF9F",
+  },
   wfPickerWrap: {
     borderWidth: 1,
     borderColor: "#A8B0BC",
