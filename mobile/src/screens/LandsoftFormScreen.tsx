@@ -623,27 +623,32 @@ export function LandsoftFormScreen({
         <Text style={styles.wfGroupTitle}>Đặc điểm và tiện ích</Text>
         {/* Phap ly luon "So hong", Loai duong tu chon theo Loai BDS (Mat tien->Mat tien duong,
             Nha hem->Duong hem lon) -> ca 2 an khoi UI, gia tri van gui ve Landsoft */}
-        <WfRow label="Ngang KV">
-          <WfDecimal
-            value={draft.width}
-            onChange={(width) => {
-              // Dien tich = Ngang x Dai (tu tinh)
-              const area = width > 0 && (draft.length ?? 0) > 0 ? Math.round(width * (draft.length ?? 0) * 100) / 100 : draft.area;
-              onChangeDraft({ width, area });
-            }}
-            placeholder="0 m"
-          />
-        </WfRow>
-        <WfRow label="Dài KV">
-          <WfDecimal
-            value={draft.length}
-            onChange={(length) => {
-              const area = length > 0 && (draft.width ?? 0) > 0 ? Math.round((draft.width ?? 0) * length * 100) / 100 : draft.area;
-              onChangeDraft({ length, area });
-            }}
-            placeholder="0 m"
-          />
-        </WfRow>
+        {/* Ngang & Dai nam ngang cung 1 hang cho gon; nhap so thap phan (4.5 / 4,5) */}
+        <View style={styles.wfDimRow}>
+          <View style={styles.wfDimCell}>
+            <Text style={styles.wfDimLabel}>Ngang</Text>
+            <WfDecimal
+              value={draft.width}
+              onChange={(width) => {
+                // Dien tich = Ngang x Dai (tu tinh)
+                const area = width > 0 && (draft.length ?? 0) > 0 ? Math.round(width * (draft.length ?? 0) * 100) / 100 : draft.area;
+                onChangeDraft({ width, area });
+              }}
+              placeholder="m"
+            />
+          </View>
+          <View style={styles.wfDimCell}>
+            <Text style={styles.wfDimLabel}>Dài</Text>
+            <WfDecimal
+              value={draft.length}
+              onChange={(length) => {
+                const area = length > 0 && (draft.width ?? 0) > 0 ? Math.round((draft.width ?? 0) * length * 100) / 100 : draft.area;
+                onChangeDraft({ length, area });
+              }}
+              placeholder="m"
+            />
+          </View>
+        </View>
       </View>
 
       {/* ===== DIEN GIAI (Tieu de an khoi UI, khong dien - giong dòng desktop TieuDe='') ===== */}

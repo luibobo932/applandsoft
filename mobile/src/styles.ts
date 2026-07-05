@@ -2115,6 +2115,19 @@ export const styles = StyleSheet.create({
   wfControl: {
     flex: 1,
   },
+  wfDimRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 5,
+  },
+  wfDimCell: {
+    flex: 1,
+  },
+  wfDimLabel: {
+    fontSize: 12.5,
+    color: "#222B3A",
+    marginBottom: 4,
+  },
   wfInput: {
     borderWidth: 1,
     borderColor: "#A8B0BC",
