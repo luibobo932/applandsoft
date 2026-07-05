@@ -267,13 +267,26 @@ export function LandsoftFormScreen({
   const wardOptions = lookups.wards.filter(
     (item) => !draft.district_code || item.parent_code === draft.district_code
   );
+  // Loai BDS chi cho chon Mat tien / Nha hem (an cac loai khac)
+  const propertyTypeOptions = useMemo(
+    () =>
+      lookups.property_types.filter((t) => {
+        const l = stripAccents(t.label);
+        return l === "mat tien" || l === "nha hem";
+      }),
+    [lookups.property_types]
+  );
+  // Tinh (TP) luon la TP HCM -> khoa cung, an khoi UI
+  const hcmProvinceCode = useMemo(() => {
+    const hcm = lookups.provinces.find((x) => stripAccents(x.label).includes("ho chi minh"));
+    return (hcm ?? lookups.provinces[0])?.code;
+  }, [lookups.provinces]);
   useEffect(() => {
-    if (!draft.province_code && lookups.provinces.length > 0) {
-      const hcm = lookups.provinces.find((x) => stripAccents(x.label).includes("ho chi minh"));
-      onChangeDraft({ province_code: (hcm ?? lookups.provinces[0]).code });
+    if (hcmProvinceCode && draft.province_code !== hcmProvinceCode) {
+      onChangeDraft({ province_code: hcmProvinceCode });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookups.provinces, draft.province_code]);
+  }, [hcmProvinceCode, draft.province_code]);
 
   // SDT trung -> o do + hien ten chu nha (giong Landsoft "Tìm" + "Số di động đã có trong hệ thống").
   // Chi check khi SDT TRON (chua them ky tu la). Them "." hoac ky tu dac biet
@@ -489,13 +502,7 @@ export function LandsoftFormScreen({
         <WfRow label="Số ĐK (*)">
           <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value={nextCode ? String(nextCode) : "Tự sinh"} editable={false} />
         </WfRow>
-        <WfRow label="Tỉnh (TP)">
-          <WfSelect
-            value={draft.province_code ?? ""}
-            items={lookups.provinces}
-            onChange={(v) => onChangeDraft({ province_code: v, district_code: "", ward_code: "", street_name: "" })}
-          />
-        </WfRow>
+        {/* Tinh (TP) luon la TP HCM -> an khoi UI, gia tri van gui ve Landsoft */}
         <WfRow label="Quận (H)">
           <WfSelect
             value={draft.district_code}
@@ -566,7 +573,7 @@ export function LandsoftFormScreen({
         <WfRow label="Loại BĐS (*)">
           <WfSelect
             value={draft.property_type_code}
-            items={lookups.property_types}
+            items={propertyTypeOptions}
             onChange={(v) => {
               // Mat tien -> Loai duong "Mat tien duong"; Nha hem -> "Duong hem lon"
               // (van doi lai duoc o muc Loai duong ben duoi)
