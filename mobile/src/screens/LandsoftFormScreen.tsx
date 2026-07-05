@@ -205,7 +205,8 @@ export function LandsoftFormScreen({
     };
   }, [token]);
 
-  // Mac dinh theo quy trinh: Cap do = Hang Hot, Nguon = Khao sat thuc te, Phap ly = So hong
+  // Mac dinh theo quy trinh: Cap do = Hang Hot, Nguon = Khao sat thuc te, Phap ly = So hong,
+  // Nhu cau = Can ban (tat ca luon co dinh -> an khoi UI)
   useEffect(() => {
     const patch: Partial<PropertyCreatePayload> = {};
     if (!draft.grade_code && lookups.grades.length > 0) {
@@ -220,9 +221,10 @@ export function LandsoftFormScreen({
       const sh = lookups.legal_statuses.find((x) => stripAccents(x.label).includes("so hong"));
       if (sh) patch.legal_status_code = sh.code;
     }
+    if (draft.listing_type !== "ban") patch.listing_type = "ban";
     if (Object.keys(patch).length > 0) onChangeDraft(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookups, draft.grade_code, draft.source_code, draft.legal_status_code]);
+  }, [lookups, draft.grade_code, draft.source_code, draft.legal_status_code, draft.listing_type]);
 
   // So nha trung -> to do (nhu logic SDT chu nha)
   const [houseCheck, setHouseCheck] = useState<{
@@ -415,7 +417,8 @@ export function LandsoftFormScreen({
       (s.label ?? "").toLowerCase().includes("duy")
     );
     finalDraft.status_code = choDuyet?.code ?? lookups.statuses[0]?.code ?? "2";
-    // Tieu de de trong neu nguoi dung khong go — giong het Landsoft desktop
+    // Tieu de an khoi UI, luon de trong — giong het dong desktop (TieuDe='')
+    finalDraft.title = "";
     setSubmitting(true);
     try {
       const result = await createProperty(token, finalDraft);
@@ -559,22 +562,7 @@ export function LandsoftFormScreen({
             ⚠ Trùng số nhà + đường + quận ({houseCheck.count} căn): {houseCheck.sample}
           </Text>
         ) : null}
-        <WfRow label="Nhu cầu">
-          <View style={styles.wfRadioRow}>
-            <Pressable style={styles.wfRadioItem} onPress={() => onChangeDraft({ listing_type: "ban" })}>
-              <View style={styles.wfRadioOuter}>
-                {draft.listing_type === "ban" ? <View style={styles.wfRadioInner} /> : null}
-              </View>
-              <Text style={styles.wfRadioText}>Cần bán</Text>
-            </Pressable>
-            <Pressable style={styles.wfRadioItem} onPress={() => onChangeDraft({ listing_type: "thue" })}>
-              <View style={styles.wfRadioOuter}>
-                {draft.listing_type === "thue" ? <View style={styles.wfRadioInner} /> : null}
-              </View>
-              <Text style={styles.wfRadioText}>Cho thuê</Text>
-            </Pressable>
-          </View>
-        </WfRow>
+        {/* Nhu cau luon "Can ban" -> an khoi UI */}
         <WfRow label="Loại BĐS (*)">
           <WfSelect
             value={draft.property_type_code}
@@ -595,17 +583,8 @@ export function LandsoftFormScreen({
             }}
           />
         </WfRow>
-        {/* Cap do (Hang Hot) va Nguon (Khao sat thuc te) luon co dinh -> an khoi UI,
-            gia tri van duoc tu dien o useEffect mac dinh va gui ve Landsoft */}
-        <WfRow label="Diện tích">
-          <TextInput
-            style={[styles.wfInput, styles.wfInputDisabled]}
-            value={draft.area ? `${draft.area} m²` : ""}
-            editable={false}
-            placeholder="= Ngang × Dài"
-          />
-        </WfRow>
-        {/* Don gia = Gia / Dien tich, luon tu tinh -> an khoi UI */}
+        {/* Cap do (Hang Hot), Nguon (Khao sat thuc te), Dien tich (= Ngang x Dai),
+            Don gia (= Gia / Dien tich) deu tu dien ngam -> an khoi UI */}
         <WfRow label="Giá bán">
           <WfDecimal value={draft.price} onChange={(v) => onChangeDraft({ price: v })} placeholder="tỷ (VD: 3.7)" />
         </WfRow>
@@ -613,10 +592,7 @@ export function LandsoftFormScreen({
         <WfRow label="Phí môi giới">
           <WfDecimal value={draft.brokerage_percent ?? 1} onChange={(v) => onChangeDraft({ brokerage_percent: v })} suffix="%" />
         </WfRow>
-        {/* Chia se luon "Noi bo" -> an khoi UI */}
-        <WfRow label="Loại tiền/ĐVT">
-          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value="VNĐ" editable={false} />
-        </WfRow>
+        {/* Chia se luon "Noi bo", Loai tien luon "VND" -> an khoi UI */}
         <WfRow label="Nhân viên">
           <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value={staffName || "Theo tài khoản đăng nhập"} editable={false} />
         </WfRow>
@@ -659,16 +635,8 @@ export function LandsoftFormScreen({
         </WfRow>
       </View>
 
-      {/* ===== TIEU DE & DIEN GIAI ===== */}
+      {/* ===== DIEN GIAI (Tieu de an khoi UI, khong dien - giong dòng desktop TieuDe='') ===== */}
       <View style={styles.wfGroup}>
-        <WfRow label="Tiêu đề">
-          <TextInput
-            style={[styles.wfInput, !!draft.title?.trim() && styles.wfInputDone]}
-            value={draft.title}
-            onChangeText={(v) => onChangeDraft({ title: v })}
-            placeholder="Tự tạo nếu bỏ trống"
-          />
-        </WfRow>
         <WfRow label="Diễn giải">
           <TextInput
             style={[styles.wfInput, styles.textArea, !!draft.description?.trim() && styles.wfInputDone]}
