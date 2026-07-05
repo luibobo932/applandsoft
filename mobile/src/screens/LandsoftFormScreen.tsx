@@ -206,7 +206,7 @@ export function LandsoftFormScreen({
   }, [token]);
 
   // Mac dinh theo quy trinh: Cap do = Hang Hot, Nguon = Khao sat thuc te, Phap ly = So hong,
-  // Nhu cau = Can ban (tat ca luon co dinh -> an khoi UI)
+  // Nhu cau = Can ban, Phi moi gioi = 1% (tat ca luon co dinh -> an khoi UI)
   useEffect(() => {
     const patch: Partial<PropertyCreatePayload> = {};
     if (!draft.grade_code && lookups.grades.length > 0) {
@@ -222,9 +222,26 @@ export function LandsoftFormScreen({
       if (sh) patch.legal_status_code = sh.code;
     }
     if (draft.listing_type !== "ban") patch.listing_type = "ban";
+    if (!draft.brokerage_percent) patch.brokerage_percent = 1;
     if (Object.keys(patch).length > 0) onChangeDraft(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookups, draft.grade_code, draft.source_code, draft.legal_status_code, draft.listing_type]);
+  }, [lookups, draft.grade_code, draft.source_code, draft.legal_status_code, draft.listing_type, draft.brokerage_percent]);
+
+  // Loai duong tu chon theo Loai BDS (Mat tien -> Mat tien duong, Nha hem -> Duong hem lon).
+  // An khoi UI nhung van dong bo ke ca khi dan tin Cho Tot pre-fill Loai BDS.
+  useEffect(() => {
+    if (!draft.property_type_code || lookups.road_types.length === 0) return;
+    const typeLabel = stripAccents(
+      lookups.property_types.find((t) => t.code === draft.property_type_code)?.label ?? ""
+    );
+    let roadKey = "";
+    if (typeLabel.includes("mat tien")) roadKey = "mat tien";
+    else if (typeLabel.includes("hem")) roadKey = "hem lon";
+    if (!roadKey) return;
+    const road = lookups.road_types.find((r) => stripAccents(r.label).includes(roadKey));
+    if (road && draft.road_type_code !== road.code) onChangeDraft({ road_type_code: road.code });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.property_type_code, lookups.road_types, lookups.property_types]);
 
   // So nha trung -> to do (nhu logic SDT chu nha)
   const [houseCheck, setHouseCheck] = useState<{
@@ -596,29 +613,16 @@ export function LandsoftFormScreen({
           <WfDecimal value={draft.price} onChange={(v) => onChangeDraft({ price: v })} placeholder="tỷ (VD: 3.7)" />
         </WfRow>
         {giaQuyDoi ? <Text style={styles.wfHint}>{giaQuyDoi}</Text> : null}
-        <WfRow label="Phí môi giới">
-          <WfDecimal value={draft.brokerage_percent ?? 1} onChange={(v) => onChangeDraft({ brokerage_percent: v })} suffix="%" />
-        </WfRow>
-        {/* Chia se luon "Noi bo", Loai tien luon "VND" -> an khoi UI */}
-        <WfRow label="Nhân viên">
-          <TextInput style={[styles.wfInput, styles.wfInputDisabled]} value={staffName || "Theo tài khoản đăng nhập"} editable={false} />
-        </WfRow>
+        {/* Phi moi gioi luon 1%, Chia se "Noi bo", Loai tien "VND", Nhan vien theo
+            tai khoan dang nhap -> tat ca an khoi UI, gia tri van gui ve Landsoft */}
         {draft.negotiable ? <Text style={styles.wfThuongLuong}>Thương lượng</Text> : null}
       </View>
 
-      {/* ===== DAC DIEM VA TIEN ICH: chi Phap ly / Loai duong / Ngang / Dai ===== */}
+      {/* ===== DAC DIEM VA TIEN ICH: chi Ngang / Dai ===== */}
       <View style={styles.wfGroup}>
         <Text style={styles.wfGroupTitle}>Đặc điểm và tiện ích</Text>
-        {/* Phap ly luon "So hong" -> an khoi UI, gia tri van tu dien va gui ve Landsoft */}
-        {lookups.road_types.length > 0 ? (
-          <WfRow label="Loại đường">
-            <WfSelect
-              value={draft.road_type_code ?? ""}
-              items={lookups.road_types}
-              onChange={(v) => onChangeDraft({ road_type_code: v })}
-            />
-          </WfRow>
-        ) : null}
+        {/* Phap ly luon "So hong", Loai duong tu chon theo Loai BDS (Mat tien->Mat tien duong,
+            Nha hem->Duong hem lon) -> ca 2 an khoi UI, gia tri van gui ve Landsoft */}
         <WfRow label="Ngang KV">
           <WfDecimal
             value={draft.width}
