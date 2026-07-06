@@ -628,8 +628,8 @@ export function CallLogsScreen({ token }: { token: string }) {
                         <View key={employee.employee_id} style={[styles.callLogEmployeeRow, selected && styles.callLogEmployeeRowSelected]}>
                           <Pressable
                             style={styles.callLogEmployeeMain}
-                            onPress={() => toggleSelected(employee.employee_id)}
-                            onLongPress={() => void openEmployeeDetails(employee)}
+                            onPress={() => void openEmployeeDetails(employee)}
+                            onLongPress={() => toggleSelected(employee.employee_id)}
                           >
                             <View style={[styles.callLogEmployeeAvatar, hasCalls && styles.callLogEmployeeAvatarActive]}>
                               <Text style={styles.callLogEmployeeAvatarText}>{employeeInitials(employee.employee_name)}</Text>

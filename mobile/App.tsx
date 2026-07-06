@@ -50,6 +50,7 @@ const API_BASE_URL_KEY = "landsoft_mobile_api_base_url";
 const DEBUG_AUTO_LOGIN_USER = process.env.EXPO_PUBLIC_DEBUG_AUTO_LOGIN_USER?.trim();
 const DEBUG_AUTO_LOGIN_PASSWORD = process.env.EXPO_PUBLIC_DEBUG_AUTO_LOGIN_PASSWORD?.trim();
 const EMULATOR_API_BASE_URL = process.env.EXPO_PUBLIC_DEBUG_EMULATOR_API_BASE_URL?.trim() ?? "";
+const BOOT_REQUEST_TIMEOUT_MS = 18000;
 
 type SessionState = {
   token: string;
@@ -98,6 +99,22 @@ const emptyLookups: LookupCollections = {
   road_types: [],
   provinces: [],
 };
+
+function withBootTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("BOOT_REQUEST_TIMEOUT")), BOOT_REQUEST_TIMEOUT_MS);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
 
 const emptyFilters: PropertyFilters = {
   keyword: "",
@@ -221,7 +238,7 @@ export default function App() {
       if (storedSession) {
         try {
           const parsed: SessionState = JSON.parse(storedSession);
-          const currentUser = await fetchMe(parsed.token);
+          const currentUser = await withBootTimeout(fetchMe(parsed.token));
           activeSession = { token: parsed.token, user: currentUser };
         } catch {
           await AsyncStorage.removeItem(SESSION_KEY);
@@ -239,7 +256,7 @@ export default function App() {
         const password = creds?.password;
         if (username && password) {
           try {
-            const response = await login({ username, password });
+            const response = await withBootTimeout(login({ username, password }));
             activeSession = { token: response.access_token, user: response.user };
             await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(activeSession));
           } catch {
