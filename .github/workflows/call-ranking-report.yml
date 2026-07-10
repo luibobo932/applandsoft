@@ -1,18 +1,19 @@
 # Bao cao Telegram 2 lan/ngay: top can duoc goi nhieu nhat trong 24h qua.
-# Chay tren cloud nen dung gio ke ca khi tat laptop.
+# Lay du lieu qua API backend Render (da duoc phep truy cap SQL) roi gui Telegram,
+# nen chay dung gio ke ca khi tat laptop.
 #
 # Gio Viet Nam (UTC+7):
 #   08:00 sang = 01:00 UTC
 #   20:00 toi  = 13:00 UTC
-# Luu y: cron GitHub co the tre 5-30 phut luc cao diem; noi dung van dung vi
-# script luon nhin lai dung 24h tinh tu thoi diem chay.
+# Cron GitHub co the tre 5-30 phut luc cao diem; noi dung van dung vi luon nhin
+# lai dung 24h tinh tu thoi diem chay.
 name: call-ranking-report
 
 on:
   schedule:
     - cron: "0 1 * * *"    # 08:00 VN
     - cron: "0 13 * * *"   # 20:00 VN
-  workflow_dispatch:        # cho phep bam chay thu tay
+  workflow_dispatch:
     inputs:
       top:
         description: "So can hien trong bang xep hang"
@@ -36,16 +37,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Cai pymssql (ket noi SQL Server tu Ubuntu)
-        run: pip install pymssql
-
       - name: Gui bao cao Telegram
         env:
-          SQL_SERVER: ${{ secrets.SQL_SERVER }}
-          SQL_PORT: ${{ secrets.SQL_PORT }}
-          SQL_DATABASE: ${{ secrets.SQL_DATABASE }}
-          SQL_USERNAME: ${{ secrets.SQL_USERNAME }}
-          SQL_PASSWORD: ${{ secrets.SQL_PASSWORD }}
+          API_BASE_URL: ${{ secrets.REPORT_API_BASE_URL }}
+          REPORT_LOGIN_USER: ${{ secrets.REPORT_LOGIN_USER }}
+          REPORT_LOGIN_PASSWORD: ${{ secrets.REPORT_LOGIN_PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |

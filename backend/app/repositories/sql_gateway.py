@@ -841,6 +841,55 @@ class SqlLandsoftGateway:
                 "latest_id": latest_id,
             }
 
+    def call_ranking(self, hours: int = 24, top: int = 15) -> dict:
+        """Xep hang cac can duoc goi SDT (LoaiDV=1) nhieu nhat trong N gio qua.
+        Dung cho bao cao Telegram 2 lan/ngay."""
+        hours = max(min(int(hours), 168), 1)
+        top = max(min(int(top), 50), 1)
+        ranking_sql = f"""
+            SELECT TOP ({top})
+                bc.MaBC AS landsoft_id,
+                COUNT(*) AS call_count,
+                COUNT(DISTINCT x.MaNV) AS staff_count,
+                MAX(x.NgayXem) AS last_call_at,
+                MAX(bc.SoNha) AS house_number,
+                MAX(s.Names) AS street_name,
+                MAX(h.TenHuyen) AS district_name,
+                MAX(CAST(COALESCE(NULLIF(bc.NgangKV, 0), NULLIF(bc.NgangXD, 0)) AS float)) AS width,
+                MAX(CAST(COALESCE(NULLIF(bc.DaiKV, 0), NULLIF(bc.DaiXD, 0)) AS float)) AS length,
+                MAX(CAST(bc.ThanhTien / 1000000000.0 AS float)) AS price,
+                MAX(COALESCE(
+                    NULLIF(LTRIM(RTRIM(bc.DienThoaiNDD)), N''),
+                    NULLIF(LTRIM(RTRIM(kh.DiDong)), N''),
+                    NULLIF(LTRIM(RTRIM(kh.DiDong2)), N''),
+                    NULLIF(LTRIM(RTRIM(kh.DienThoaiCT)), N'')
+                )) AS owner_phone
+            FROM dbo.mglNhanVienXem x
+            JOIN dbo.mglbcBanChoThue bc ON bc.MaBC = x.KeyID
+            LEFT JOIN dbo.KhachHang kh ON kh.MaKH = bc.MaKH
+            LEFT JOIN dbo.Street s ON s.ID = bc.StreetID
+            LEFT JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
+            WHERE x.LoaiDV = 1
+              AND x.NgayXem >= DATEADD(HOUR, -{hours}, GETDATE())
+            GROUP BY bc.MaBC
+            ORDER BY COUNT(*) DESC, MAX(x.NgayXem) DESC
+        """
+        total_sql = f"""
+            SELECT COUNT(*) AS total_calls, COUNT(DISTINCT x.KeyID) AS total_houses
+            FROM dbo.mglNhanVienXem x
+            WHERE x.LoaiDV = 1
+              AND x.NgayXem >= DATEADD(HOUR, -{hours}, GETDATE())
+        """
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(ranking_sql)
+            items = self._fetch_all_dicts(cursor)
+            cursor.execute(total_sql)
+            trow = cursor.fetchone()
+            total_calls = int(trow[0]) if trow else 0
+            total_houses = int(trow[1]) if trow else 0
+        return {"items": items, "total_calls": total_calls, "total_houses": total_houses, "hours": hours}
+
     # Sap xep: whitelist cung de tranh SQL injection (khong noi chuoi nguoi dung vao ORDER BY)
     _AREA_EXPR = "COALESCE(NULLIF(bc.DienTich, 0), NULLIF(bc.DienTichKV, 0), NULLIF(bc.DienTichXD, 0))"
     SORT_OPTIONS = {
