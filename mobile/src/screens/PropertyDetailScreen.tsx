@@ -25,6 +25,7 @@ import {
 } from "../utils";
 import {
   addPropertyNote,
+  deleteProperty,
   fetchPropertyDetail,
   fetchPropertyHistory,
   updatePropertyStatus,
@@ -131,6 +132,34 @@ export function PropertyDetailScreen({
     }
   };
 
+  // Xoa can: chi cho xoa can do chinh minh nhap (backend chan 403 neu khong phai).
+  // Xac nhan 1 nhip vi xoa cung ca lich su, KHONG hoan tac duoc.
+  const doDelete = async () => {
+    setSubmitting(true);
+    try {
+      const result = await deleteProperty(token, propertyId);
+      Alert.alert("Đã xóa", result.message);
+      await onChanged();
+      onBack();
+    } catch (error) {
+      Alert.alert("Không xóa được", normalizeApiError(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    const addr = cleanDisplayText(property?.address, `căn ${propertyId}`);
+    Alert.alert(
+      "Xóa căn này?",
+      `${addr}\n\nCăn sẽ bị xóa khỏi Landsoft cùng toàn bộ lịch sử — KHÔNG thể hoàn tác.\n(Chỉ xóa được căn do chính bạn nhập.)`,
+      [
+        { text: "Không", style: "cancel" },
+        { text: "Xóa vĩnh viễn", style: "destructive", onPress: () => void doDelete() },
+      ]
+    );
+  };
+
   const submitNote = async () => {
     if (!note.trim()) {
       Alert.alert("Thiếu ghi chú", "Nhập nội dung ghi chú trước.");
@@ -197,6 +226,9 @@ export function PropertyDetailScreen({
           <Text style={styles.detailNavButtonText}>Kho hàng</Text>
         </Pressable>
         <View style={styles.detailTopBarActions}>
+          <Pressable style={styles.detailDeleteButton} onPress={confirmDelete} disabled={submitting}>
+            <Feather name="trash-2" size={18} color="#C0392B" />
+          </Pressable>
           <Pressable style={styles.detailTopIconButton} onPress={() => void copySummary()}>
             <Feather name="copy" size={18} color="#17305D" />
           </Pressable>

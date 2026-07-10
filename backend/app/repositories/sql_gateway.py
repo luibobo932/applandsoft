@@ -890,6 +890,34 @@ class SqlLandsoftGateway:
             total_houses = int(trow[1]) if trow else 0
         return {"items": items, "total_calls": total_calls, "total_houses": total_houses, "hours": hours}
 
+    def delete_property(self, landsoft_id: int, actor: AuthenticatedUser) -> dict:
+        """Xoa can + lich su cua no. CHI cho xoa can do chinh nguoi dang nhap tao
+        (MaNVKD trung MaNV) — tranh xoa nham hang cua nhan vien khac."""
+        if not actor.landsoft_user_id:
+            raise ValueError("Tài khoản không gắn với nhân viên Landsoft nên không xóa được")
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT bc.MaBC, bc.MaNVKD, bc.SoNha, s.Names AS TenDuong
+                FROM dbo.mglbcBanChoThue bc
+                LEFT JOIN dbo.Street s ON s.ID = bc.StreetID
+                WHERE bc.MaBC = ?
+                """,
+                landsoft_id,
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise LookupError("Không tìm thấy căn này — có thể đã bị xóa trước đó")
+            creator = int(row[1]) if row[1] is not None else None
+            if creator != int(actor.landsoft_user_id):
+                raise PermissionError("Chỉ xóa được căn do chính bạn nhập")
+            address = " ".join(part for part in [(row[2] or "").strip(), (row[3] or "").strip()] if part)
+            cursor.execute("DELETE FROM dbo.mglbcLichSu WHERE MaBC = ?", landsoft_id)
+            cursor.execute("DELETE FROM dbo.mglbcBanChoThue WHERE MaBC = ?", landsoft_id)
+            conn.commit()
+        return {"message": f"Đã xóa căn {address or landsoft_id}", "landsoft_id": landsoft_id}
+
     # Sap xep: whitelist cung de tranh SQL injection (khong noi chuoi nguoi dung vao ORDER BY)
     _AREA_EXPR = "COALESCE(NULLIF(bc.DienTich, 0), NULLIF(bc.DienTichKV, 0), NULLIF(bc.DienTichXD, 0))"
     SORT_OPTIONS = {

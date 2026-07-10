@@ -1267,6 +1267,16 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  detailDeleteButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#F5B7B1",
+    backgroundColor: "#FDEDEC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   detailTopIconButtonPrimary: {
     width: 42,
     height: 42,

@@ -110,6 +110,21 @@ def create_property(payload: PropertyCreateRequest, user=Depends(current_user)) 
     return ActionResponse(message=result["message"], landsoft_id=result["landsoft_id"])
 
 
+@router.delete("/properties/{landsoft_id}", response_model=ActionResponse)
+def delete_property(landsoft_id: int, user=Depends(current_user)) -> ActionResponse:
+    """Xoa can (chi can do chinh minh nhap). Xoa cung ca lich su — giong nut Xóa desktop."""
+    try:
+        result = get_gateway().delete_property(landsoft_id, user)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    log_action(user, "delete_property", "property", {"landsoft_id": landsoft_id}, result)
+    return ActionResponse(message=result["message"], landsoft_id=result["landsoft_id"])
+
+
 @router.get("/properties/{landsoft_id}/history", response_model=list[PropertyHistoryItem])
 def property_history(landsoft_id: int, _user=Depends(current_user)) -> list[PropertyHistoryItem]:
     return [PropertyHistoryItem(**item) for item in get_gateway().list_property_history(landsoft_id)]

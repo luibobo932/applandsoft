@@ -194,6 +194,10 @@ export async function updatePropertyStatus(
   );
 }
 
+export async function deleteProperty(token: string, landsoftId: number): Promise<ActionResponse> {
+  return request<ActionResponse>(`/properties/${landsoftId}`, { method: "DELETE" }, token);
+}
+
 export async function addPropertyNote(
   token: string,
   landsoftId: number,
