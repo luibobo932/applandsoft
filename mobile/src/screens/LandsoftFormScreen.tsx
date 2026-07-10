@@ -451,6 +451,33 @@ export function LandsoftFormScreen({
       Alert.alert("Chưa đủ dữ liệu", error);
       return;
     }
+    // Dang co canh bao trung -> bat xac nhan 1 nhip truoc khi luu (van cho luu)
+    const dupWarnings: string[] = [];
+    if (houseDup) {
+      dupWarnings.push(
+        `• Số nhà TRÙNG với ${houseCheck.count} căn có sẵn (cùng đường + quận): ${houseCheck.sample}`
+      );
+    }
+    if (phoneDup) {
+      dupWarnings.push(
+        `• SĐT chủ nhà đã có trong hệ thống${phoneCheck.ownerName ? ` — ${phoneCheck.ownerName}` : ""}`
+      );
+    }
+    if (dupWarnings.length > 0) {
+      Alert.alert(
+        "⚠ Đang có cảnh báo trùng",
+        `${dupWarnings.join("\n")}\n\nBạn vẫn muốn lưu căn này chứ?`,
+        [
+          { text: "Xem lại", style: "cancel" },
+          { text: "Vẫn lưu", style: "destructive", onPress: () => void performSave() },
+        ]
+      );
+      return;
+    }
+    await performSave();
+  };
+
+  const performSave = async () => {
     const finalDraft = { ...draft };
     // Trang thai mac dinh: Cho duyet (tim theo nhan, fallback ma 2)
     const choDuyet = lookups.statuses.find((s) =>
