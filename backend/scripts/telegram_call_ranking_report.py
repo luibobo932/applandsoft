@@ -2,13 +2,17 @@
 Bao cao Telegram 2 lan/ngay (8h sang & 8h toi): xep hang cac can nha duoc goi
 NHIEU NHAT trong 24 gio truoc gio bao cao, kem so luot goi.
 
-Lay du lieu qua API backend (Render da duoc phep truy cap SQL Landsoft) — nen chay
-duoc tu bat ky dau (GitHub Actions, laptop) ma khong can driver SQL hay mo firewall.
+Lay du lieu qua API backend (Render da duoc phep truy cap SQL Landsoft) -> chay
+duoc tu bat ky dau (GitHub Actions, laptop) ma khong can driver SQL / mo firewall.
+
+Uu tien endpoint /reports/call-ranking (gom nhom san o SQL). Neu backend chua co
+endpoint do (chua deploy), tu dong quay ve /call-logs roi gom nhom tai cho.
+
+QUAN TRONG ve mui gio: API tra `called_at` theo gio Viet Nam (gio SQL server),
+trong khi GitHub Actions chay theo UTC -> luon quy doi sang gio VN truoc khi so.
 
 Bien moi truong:
-  API_BASE_URL            (mac dinh production Render)
-  REPORT_LOGIN_USER       (mac dinh SKL-473)
-  REPORT_LOGIN_PASSWORD   (mac dinh 1)
+  API_BASE_URL, REPORT_LOGIN_USER, REPORT_LOGIN_PASSWORD,
   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 Chay: python telegram_call_ranking_report.py [--top 15] [--hours 24] [--dry-run]
@@ -19,14 +23,18 @@ import argparse
 import html
 import json
 import os
+import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 DEFAULT_API_BASE = "https://landsoft-mobile-api.onrender.com/api/v1"
 MAX_TELEGRAM_MESSAGE = 3900
+VN_TZ = timezone(timedelta(hours=7))
+CALL_LOGS_MAX_LIMIT = 500
 
 
 def load_dotenv(path: Path) -> None:
@@ -38,6 +46,11 @@ def load_dotenv(path: Path) -> None:
             continue
         key, value = line.split("=", 1)
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def now_vn() -> datetime:
+    """Gio Viet Nam dang naive, de so truc tiep voi called_at tu API."""
+    return datetime.now(timezone.utc).astimezone(VN_TZ).replace(tzinfo=None)
 
 
 def fmt_num(value: Any) -> str:
@@ -54,36 +67,94 @@ def api_base() -> str:
     return (os.getenv("API_BASE_URL") or DEFAULT_API_BASE).rstrip("/")
 
 
-def _post_json(url: str, body: dict, headers: dict | None = None, timeout: int = 60) -> dict:
-    data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST")
-    req.add_header("Content-Type", "application/json")
+def _request_json(url: str, headers: dict | None = None, body: dict | None = None, timeout: int = 90) -> dict:
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(url, data=data, method="POST" if data else "GET")
+    if data:
+        req.add_header("Content-Type", "application/json")
     for k, v in (headers or {}).items():
         req.add_header(k, v)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _get_json(url: str, headers: dict | None = None, timeout: int = 60) -> dict:
-    req = urllib.request.Request(url, method="GET")
-    for k, v in (headers or {}).items():
-        req.add_header(k, v)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+def login() -> str:
+    user = os.getenv("REPORT_LOGIN_USER", "SKL-473")
+    password = os.getenv("REPORT_LOGIN_PASSWORD", "1")
+    # Render free co the "ngu" -> timeout dai de danh thuc dich vu.
+    res = _request_json(f"{api_base()}/auth/login", body={"username": user, "password": password}, timeout=120)
+    return res["access_token"]
+
+
+def _aggregate_from_call_logs(token: str, top: int, hours: int) -> dict:
+    """Fallback: lay log tho roi gom nhom theo can tai cho."""
+    end_vn = now_vn()
+    start_vn = end_vn - timedelta(hours=hours)
+    q = urllib.parse.urlencode(
+        {
+            "from_date": start_vn.date().isoformat(),
+            "to_date": end_vn.date().isoformat(),
+            "limit": CALL_LOGS_MAX_LIMIT,
+        }
+    )
+    raw = _request_json(f"{api_base()}/call-logs?{q}", {"Authorization": f"Bearer {token}"})
+    items = raw.get("items", [])
+    if raw.get("total", 0) > CALL_LOGS_MAX_LIMIT:
+        # API tra ve log MOI NHAT truoc, nen 500 ban ghi dau van phu het cua so gio yeu cau.
+        print(f"[canh bao] Khoang ngay co {raw['total']} log, chi lay {CALL_LOGS_MAX_LIMIT} log moi nhat.")
+
+    groups: dict[Any, dict] = {}
+    staff: dict[Any, set] = defaultdict(set)
+    for it in items:
+        called_at = datetime.fromisoformat(str(it["called_at"]))
+        if called_at < start_vn:  # loc chinh xac dung cua so N gio
+            continue
+        key = it.get("landsoft_id")
+        g = groups.get(key)
+        if g is None:
+            g = {
+                "landsoft_id": key,
+                "call_count": 0,
+                "last_call_at": called_at,
+                "house_number": it.get("house_number"),
+                "street_name": it.get("street_name"),
+                "district_name": it.get("district_name"),
+                "width": it.get("width"),
+                "length": it.get("length"),
+                "price": it.get("price"),
+                "owner_phone": it.get("owner_phone"),
+            }
+            groups[key] = g
+        g["call_count"] += 1
+        g["last_call_at"] = max(g["last_call_at"], called_at)
+        staff[key].add(it.get("employee_id"))
+
+    for key, g in groups.items():
+        g["staff_count"] = len(staff[key])
+    ranked = sorted(groups.values(), key=lambda g: (-g["call_count"], -g["last_call_at"].timestamp()))
+    total_calls = sum(g["call_count"] for g in groups.values())
+    return {
+        "items": ranked[:top],
+        "total_calls": total_calls,
+        "total_houses": len(groups),
+        "hours": hours,
+    }
 
 
 def fetch_ranking(top: int, hours: int) -> dict:
-    user = os.getenv("REPORT_LOGIN_USER", "SKL-473")
-    password = os.getenv("REPORT_LOGIN_PASSWORD", "1")
-    # Render free co the "ngu" -> lan login dau timeout dai de danh thuc.
-    login = _post_json(f"{api_base()}/auth/login", {"username": user, "password": password}, timeout=90)
-    token = login["access_token"]
+    token = login()
     q = urllib.parse.urlencode({"hours": hours, "top": top})
-    return _get_json(f"{api_base()}/reports/call-ranking?{q}", {"Authorization": f"Bearer {token}"}, timeout=90)
+    try:
+        return _request_json(f"{api_base()}/reports/call-ranking?{q}", {"Authorization": f"Bearer {token}"})
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+        print("[info] Backend chua co /reports/call-ranking -> gom nhom tu /call-logs.")
+        return _aggregate_from_call_logs(token, top, hours)
 
 
 def build_message(data: dict, hours: int) -> str:
-    now = datetime.now()
+    now = now_vn()
     phien = "sáng" if now.hour < 12 else "tối"
     rows = data.get("items", [])
     header = (
