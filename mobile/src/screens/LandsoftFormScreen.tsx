@@ -387,9 +387,16 @@ export function LandsoftFormScreen({
     if (!option.patch.address) missing.push("số nhà");
     if (!option.patch.owner_name) missing.push("tên chủ nhà");
     if (!option.patch.contact_phone) missing.push("SĐT");
+    // Thieu ten duong -> canh bao RIENG that ro: khong co no thi kiem tra trung
+    // so nha khong chay duoc (vu 651/2 bi nhap trung ngay 10/07)
+    const noStreet = !option.patch.street_name;
     Alert.alert(
-      "Đã điền từ tin Chợ Tốt",
-      `Đã điền: ${option.filled.join(", ")}.\n\nKiểm tra lại thông tin${missing.length ? `, bổ sung ${missing.join(" + ")}` : ""} rồi bấm Lưu.`
+      noStreet ? "⚠ Chưa nhận ra TÊN ĐƯỜNG" : "Đã điền từ tin Chợ Tốt",
+      `Đã điền: ${option.filled.join(", ")}.\n\n` +
+        (noStreet
+          ? "Tin này không ghi rõ tên đường — hãy CHỌN TÊN ĐƯỜNG bằng tay (bấm mũi tên ở ô Tên đường), nếu không app sẽ không kiểm tra được trùng số nhà."
+          : "") +
+        `${missing.length ? `Bổ sung thêm: ${missing.join(" + ")}. ` : ""}Kiểm tra lại rồi bấm Lưu.`
     );
   };
 
@@ -424,6 +431,9 @@ export function LandsoftFormScreen({
 
   const validate = (): string | null => {
     if (!draft.address?.trim()) return "Thiếu số nhà / địa chỉ";
+    // Bat buoc ten duong: thieu no thi canh bao trung so nha cung khong chay,
+    // de lot ban ghi thieu duong len Landsoft (vu 651/2 ngay 10/07)
+    if (!draft.street_name?.trim()) return "Thiếu tên đường";
     if (!draft.district_code) return "Thiếu quận";
     if (!draft.ward_code) return "Thiếu phường";
     if (!draft.property_type_code) return "Thiếu loại BĐS";

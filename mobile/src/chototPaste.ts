@@ -280,6 +280,24 @@ export function parseChototListing(
     }
   }
 
+  // Tin viet "nguoc chieu": ten duong TRUOC so nha, VD
+  // "Cần bán nhà gấp đường Điện biên phủ 651/2 liên hệ..." -> duong + so nha.
+  // Chi chay khi cach thuong khong bat duoc, quet tren toan van ban.
+  if (!patch.street_name) {
+    const reversed = (text || "").match(
+      /(?:^|[\s,.])(?:đường|duong|Đường|Duong)\s+(\p{L}[\p{L} .]*?)\s+(\d+[a-zA-Z]?(?:\/\d+[a-zA-Z]?)+|\d+[a-zA-Z]?)(?=[\s,.]|$)/u
+    );
+    if (reversed) {
+      const streetRev = reversed[1].trim();
+      patch.street_name = streetRev;
+      filled.push(`đường (${streetRev})`);
+      if (!patch.address) {
+        patch.address = reversed[2];
+        filled.push(`số nhà (${reversed[2]})`);
+      }
+    }
+  }
+
   // --- Gia: uu tien dong "Gia:"; tin tu do thi tim "giá 15,5 tỷ" / "15,5 tỷ"
   let priceText = labelValue(lines, /^gia\s*:/);
   if (!priceText) {
