@@ -121,7 +121,8 @@ def delete_property(landsoft_id: int, user=Depends(current_user)) -> ActionRespo
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    log_action(user, "delete_property", "property", {"landsoft_id": landsoft_id}, result)
+    # KHONG log_action cho xoa: theo yeu cau, khong luu dau vet tai khoan nao da xoa.
+    # (Trigger DB chi chay khi INSERT nen xoa cung khong de lai vet o SQL.)
     return ActionResponse(message=result["message"], landsoft_id=result["landsoft_id"])
 
 
