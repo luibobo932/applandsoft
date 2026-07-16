@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 import re
 from typing import Any
 
@@ -1001,7 +1000,8 @@ class SqlLandsoftGateway:
         if not actor.landsoft_user_id:
             raise ValueError("User hiện tại chưa map với nhân viên Landsoft.")
 
-        ward = self._resolve_ward(payload["ward_code"], payload["district_code"])
+        # Xac thuc phuong/quan hop le trong Landsoft (raise neu sai) truoc khi insert
+        self._resolve_ward(payload["ward_code"], payload["district_code"])
         street_id = self._resolve_street_id(payload["district_code"], payload.get("street_name"))
         total_price = self._price_to_vnd(float(payload["price"]))
         area = float(payload["area"])
