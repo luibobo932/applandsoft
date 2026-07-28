@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import { Modal, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 
 import { styles } from "../styles";
 import { cleanDisplayText } from "../utils";
+import { QuickAccount, isSameAccount } from "../quickAccounts";
 import { CurrentUser, LookupItem } from "../types";
 
 export type LandsoftView =
@@ -88,6 +89,9 @@ export function LandsoftDrawer({
   onChange,
   onClose,
   onLogout,
+  accounts = [],
+  switchingAccount = null,
+  onSwitchAccount,
 }: {
   visible: boolean;
   activeTab: LandsoftView;
@@ -95,7 +99,11 @@ export function LandsoftDrawer({
   onChange: (tab: LandsoftView) => void;
   onClose: () => void;
   onLogout: () => void;
+  accounts?: QuickAccount[];
+  switchingAccount?: string | null;
+  onSwitchAccount?: (account: QuickAccount) => void;
 }) {
+  const currentUsername = user.landsoft_username ?? user.username;
   const items: Array<{ key: LandsoftView; label: string; icon: React.ComponentProps<typeof Feather>["name"] }> = [
     { key: "workspace", label: "HomeApp", icon: "grid" },
     { key: "kingland", label: "King Land", icon: "monitor" },
@@ -114,6 +122,35 @@ export function LandsoftDrawer({
               {cleanDisplayText(user.role_name || "Môi giới")} · {cleanDisplayText(user.landsoft_username ?? user.username)}
             </Text>
           </View>
+          {accounts.length > 1 && onSwitchAccount ? (
+            <View style={styles.drawerAccountBox}>
+              <Text style={styles.drawerAccountTitle}>Chuyển tài khoản</Text>
+              {accounts.map((account) => {
+                const current = isSameAccount(currentUsername, account);
+                const busy = switchingAccount === account.username;
+                return (
+                  <Pressable
+                    key={account.username}
+                    style={[styles.drawerAccountRow, current && styles.drawerAccountRowActive]}
+                    disabled={current || switchingAccount !== null}
+                    onPress={() => onSwitchAccount(account)}
+                  >
+                    <View style={[styles.drawerAccountDot, current && styles.drawerAccountDotActive]}>
+                      {current ? <Feather name="check" size={12} color="#ffffff" /> : null}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.drawerAccountName, current && styles.drawerAccountNameActive]}>
+                        {account.label}
+                      </Text>
+                      <Text style={styles.drawerAccountCode}>{account.username}</Text>
+                    </View>
+                    {busy ? <ActivityIndicator size="small" color="#15428B" /> : null}
+                    {!busy && current ? <Text style={styles.drawerAccountBadge}>đang dùng</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           {items.map((item) => {
             const active = activeTab === item.key;
             return (

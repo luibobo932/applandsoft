@@ -16,6 +16,7 @@ import {
 } from "./src/api";
 import { defaultApiBaseUrl, getApiBaseUrl, setApiBaseUrl } from "./src/config";
 import { AppHeader, LandsoftDrawer, LandsoftView } from "./src/components/shared";
+import { QUICK_ACCOUNTS, QuickAccount, isSameAccount } from "./src/quickAccounts";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { PropertyListScreen } from "./src/screens/PropertyListScreen";
 import { PropertyDetailScreen } from "./src/screens/PropertyDetailScreen";
@@ -384,6 +385,33 @@ export default function App() {
     [loadActivity, loadLookups, loadProperties]
   );
 
+  // Chuyen nhanh giua cac tai khoan cau hinh san (menu 3 gach) — khong can dang xuat.
+  // Doi session xong, effect o duoi tu tai lai toan bo du lieu theo tai khoan moi.
+  const [switchingAccount, setSwitchingAccount] = useState<string | null>(null);
+  const handleSwitchAccount = useCallback(
+    async (account: QuickAccount) => {
+      if (isSameAccount(session?.user.landsoft_username ?? session?.user.username, account)) {
+        return;
+      }
+      setSwitchingAccount(account.username);
+      try {
+        const response = await login({ username: account.username, password: account.password });
+        const nextSession = { token: response.access_token, user: response.user };
+        await AsyncStorage.multiSet([
+          [SESSION_KEY, JSON.stringify(nextSession)],
+          [CREDS_KEY, JSON.stringify({ username: account.username, password: account.password })],
+        ]);
+        setSelectedPropertyId(null);
+        setSession(nextSession);
+      } catch (error) {
+        Alert.alert("Không chuyển được tài khoản", normalizeApiError(error));
+      } finally {
+        setSwitchingAccount(null);
+      }
+    },
+    [session]
+  );
+
   const handleLogin = async (payload: LoginPayload) => {
     setLoginLoading(true);
     try {
@@ -612,6 +640,9 @@ export default function App() {
           setMenuOpen(false);
           void handleLogout();
         }}
+        accounts={QUICK_ACCOUNTS}
+        switchingAccount={switchingAccount}
+        onSwitchAccount={(account) => void handleSwitchAccount(account)}
       />
     </SafeAreaView>
   );
