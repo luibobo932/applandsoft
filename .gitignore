@@ -37,3 +37,7 @@ runtime/*.json
 
 # Local git backups
 _git-backup/
+
+# Trang thai rieng cua watchdog (khong commit - doi lien tuc, ~700KB)
+backend/data/status_watch.db
+backend/data/status_watch.log
