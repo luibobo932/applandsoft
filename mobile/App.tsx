@@ -256,8 +256,11 @@ export default function App() {
       // 2. Khong co phien hoac token het han -> tu dang nhap lai.
       if (!activeSession) {
         const savedCreds = storedCreds ? JSON.parse(storedCreds) : null;
+        // Chi dung tai khoan debug khi chay ban DEV. Ban release LUON dung tai khoan
+        // da luu tren may — neu khong, doi tai khoan xong het phien la bi keo ve
+        // tai khoan debug, va mat khau bi nhung vao file APK.
         const creds =
-          DEBUG_AUTO_LOGIN_USER && DEBUG_AUTO_LOGIN_PASSWORD
+          __DEV__ && DEBUG_AUTO_LOGIN_USER && DEBUG_AUTO_LOGIN_PASSWORD
             ? { username: DEBUG_AUTO_LOGIN_USER, password: DEBUG_AUTO_LOGIN_PASSWORD }
             : savedCreds;
         const username = creds?.username;
@@ -430,7 +433,9 @@ export default function App() {
         // 1) Thu dung lai phien da luu — nhanh nhat, khong can mat khau
         try {
           const user = await fetchMe(account.token);
-          await applySession({ token: account.token, user });
+          // Truyen ca password de CREDS_KEY tro sang tai khoan nay — mo lai app
+          // se vao dung tai khoan vua chuyen, khong bi keo ve tai khoan cu.
+          await applySession({ token: account.token, user }, account.password);
           return;
         } catch {
           // phien het han (12h) -> sang buoc 2
