@@ -16,12 +16,13 @@ import {
 } from "./src/api";
 import { defaultApiBaseUrl, getApiBaseUrl, setApiBaseUrl } from "./src/config";
 import { AppHeader, LandsoftDrawer, LandsoftView } from "./src/components/shared";
+import { QUICK_ACCOUNTS, findQuickAccount } from "./src/quickAccounts";
 import {
   SavedAccount,
   forgetAccount,
-  loadSavedAccounts,
   rememberAccount,
   sameUser,
+  seedAccounts,
   updateAccountToken,
 } from "./src/savedAccounts";
 import { LoginScreen } from "./src/screens/LoginScreen";
@@ -256,13 +257,14 @@ export default function App() {
       // 2. Khong co phien hoac token het han -> tu dang nhap lai.
       if (!activeSession) {
         const savedCreds = storedCreds ? JSON.parse(storedCreds) : null;
-        // Chi dung tai khoan debug khi chay ban DEV. Ban release LUON dung tai khoan
-        // da luu tren may — neu khong, doi tai khoan xong het phien la bi keo ve
-        // tai khoan debug, va mat khau bi nhung vao file APK.
+        // Thu tu uu tien de "mo app la vao thang":
+        //   1. Tai khoan dung lan cuoi (khong bi keo ve tai khoan khac)
+        //   2. Tai khoan dau tien trong cau hinh .env
+        const lastUsed = findQuickAccount(savedCreds?.username);
         const creds =
-          __DEV__ && DEBUG_AUTO_LOGIN_USER && DEBUG_AUTO_LOGIN_PASSWORD
-            ? { username: DEBUG_AUTO_LOGIN_USER, password: DEBUG_AUTO_LOGIN_PASSWORD }
-            : savedCreds;
+          savedCreds?.username && savedCreds?.password
+            ? savedCreds
+            : lastUsed ?? QUICK_ACCOUNTS[0] ?? null;
         const username = creds?.username;
         const password = creds?.password;
         if (username && password) {
@@ -402,8 +404,9 @@ export default function App() {
   const [switchingAccount, setSwitchingAccount] = useState<string | null>(null);
   const [addingAccount, setAddingAccount] = useState(false);
 
+  // Nap san 2 tai khoan cau hinh -> menu 3 gach hien ca 2 ngay lan mo dau tien
   useEffect(() => {
-    void loadSavedAccounts().then(setSavedAccounts);
+    void seedAccounts(QUICK_ACCOUNTS).then(setSavedAccounts);
   }, []);
 
   const applySession = useCallback(async (nextSession: SessionState, password?: string) => {
@@ -430,15 +433,17 @@ export default function App() {
       }
       setSwitchingAccount(account.username);
       try {
-        // 1) Thu dung lai phien da luu — nhanh nhat, khong can mat khau
-        try {
-          const user = await fetchMe(account.token);
-          // Truyen ca password de CREDS_KEY tro sang tai khoan nay — mo lai app
-          // se vao dung tai khoan vua chuyen, khong bi keo ve tai khoan cu.
-          await applySession({ token: account.token, user }, account.password);
-          return;
-        } catch {
-          // phien het han (12h) -> sang buoc 2
+        // 1) Thu dung lai phien da luu — nhanh nhat, khong can dang nhap lai
+        if (account.token) {
+          try {
+            const user = await fetchMe(account.token);
+            // Truyen ca password de CREDS_KEY tro sang tai khoan nay — mo lai app
+            // se vao dung tai khoan vua chuyen, khong bi keo ve tai khoan cu.
+            await applySession({ token: account.token, user }, account.password);
+            return;
+          } catch {
+            // phien het han (12h) -> sang buoc 2
+          }
         }
 
         // 2) Con nho mat khau tren may -> tu dang nhap lai, van khong phai go

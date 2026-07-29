@@ -69,6 +69,40 @@ export async function updateAccountToken(username: string, token: string): Promi
   return next;
 }
 
+/**
+ * Nap san cac tai khoan cau hinh trong .env vao danh sach, de menu 3 gach hien
+ * ca 2 tai khoan ngay lan mo app dau tien (chua tung dang nhap tay).
+ * Giu nguyen token/ten hien thi neu tai khoan do da co san.
+ */
+export async function seedAccounts(
+  configs: { username: string; password: string; label: string }[]
+): Promise<SavedAccount[]> {
+  if (configs.length === 0) return loadSavedAccounts();
+  const accounts = await loadSavedAccounts();
+  let changed = false;
+
+  for (const cfg of configs) {
+    const existing = accounts.find((a) => sameUser(a.username, cfg.username));
+    if (!existing) {
+      accounts.push({
+        username: cfg.username,
+        displayName: cfg.label,
+        token: "",
+        password: cfg.password,
+        savedAt: new Date().toISOString(),
+      });
+      changed = true;
+    } else if (existing.password !== cfg.password) {
+      // Mat khau trong cau hinh moi hon -> cap nhat
+      existing.password = cfg.password;
+      changed = true;
+    }
+  }
+
+  if (changed) await writeAccounts(accounts);
+  return accounts;
+}
+
 export async function forgetAccount(username: string): Promise<SavedAccount[]> {
   const accounts = await loadSavedAccounts();
   const next = accounts.filter((a) => !sameUser(a.username, username));
