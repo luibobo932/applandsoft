@@ -4,7 +4,7 @@ import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 
 import { styles } from "../styles";
 import { cleanDisplayText } from "../utils";
-import { QuickAccount, isSameAccount } from "../quickAccounts";
+import { SavedAccount, sameUser } from "../savedAccounts";
 import { CurrentUser, LookupItem } from "../types";
 
 export type LandsoftView =
@@ -92,6 +92,8 @@ export function LandsoftDrawer({
   accounts = [],
   switchingAccount = null,
   onSwitchAccount,
+  onAddAccount,
+  onForgetAccount,
 }: {
   visible: boolean;
   activeTab: LandsoftView;
@@ -99,9 +101,11 @@ export function LandsoftDrawer({
   onChange: (tab: LandsoftView) => void;
   onClose: () => void;
   onLogout: () => void;
-  accounts?: QuickAccount[];
+  accounts?: SavedAccount[];
   switchingAccount?: string | null;
-  onSwitchAccount?: (account: QuickAccount) => void;
+  onSwitchAccount?: (account: SavedAccount) => void;
+  onAddAccount?: () => void;
+  onForgetAccount?: (account: SavedAccount) => void;
 }) {
   const currentUsername = user.landsoft_username ?? user.username;
   const items: Array<{ key: LandsoftView; label: string; icon: React.ComponentProps<typeof Feather>["name"] }> = [
@@ -122,11 +126,11 @@ export function LandsoftDrawer({
               {cleanDisplayText(user.role_name || "Môi giới")} · {cleanDisplayText(user.landsoft_username ?? user.username)}
             </Text>
           </View>
-          {accounts.length > 1 && onSwitchAccount ? (
+          {onSwitchAccount ? (
             <View style={styles.drawerAccountBox}>
               <Text style={styles.drawerAccountTitle}>Chuyển tài khoản</Text>
               {accounts.map((account) => {
-                const current = isSameAccount(currentUsername, account);
+                const current = sameUser(currentUsername, account.username);
                 const busy = switchingAccount === account.username;
                 return (
                   <Pressable
@@ -134,13 +138,14 @@ export function LandsoftDrawer({
                     style={[styles.drawerAccountRow, current && styles.drawerAccountRowActive]}
                     disabled={current || switchingAccount !== null}
                     onPress={() => onSwitchAccount(account)}
+                    onLongPress={() => onForgetAccount?.(account)}
                   >
                     <View style={[styles.drawerAccountDot, current && styles.drawerAccountDotActive]}>
                       {current ? <Feather name="check" size={12} color="#ffffff" /> : null}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.drawerAccountName, current && styles.drawerAccountNameActive]}>
-                        {account.label}
+                        {account.displayName}
                       </Text>
                       <Text style={styles.drawerAccountCode}>{account.username}</Text>
                     </View>
@@ -149,6 +154,15 @@ export function LandsoftDrawer({
                   </Pressable>
                 );
               })}
+              {onAddAccount ? (
+                <Pressable style={styles.drawerAddAccount} onPress={onAddAccount}>
+                  <Feather name="plus" size={16} color="#15428B" />
+                  <Text style={styles.drawerAddAccountText}>Thêm tài khoản khác</Text>
+                </Pressable>
+              ) : null}
+              {accounts.length > 1 ? (
+                <Text style={styles.drawerAccountHint}>Giữ lâu một tài khoản để xóa khỏi máy</Text>
+              ) : null}
             </View>
           ) : null}
           {items.map((item) => {

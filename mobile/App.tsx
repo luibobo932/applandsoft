@@ -16,7 +16,14 @@ import {
 } from "./src/api";
 import { defaultApiBaseUrl, getApiBaseUrl, setApiBaseUrl } from "./src/config";
 import { AppHeader, LandsoftDrawer, LandsoftView } from "./src/components/shared";
-import { QUICK_ACCOUNTS, QuickAccount, isSameAccount } from "./src/quickAccounts";
+import {
+  SavedAccount,
+  forgetAccount,
+  loadSavedAccounts,
+  rememberAccount,
+  sameUser,
+  updateAccountToken,
+} from "./src/savedAccounts";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { PropertyListScreen } from "./src/screens/PropertyListScreen";
 import { PropertyDetailScreen } from "./src/screens/PropertyDetailScreen";
@@ -385,29 +392,94 @@ export default function App() {
     [loadActivity, loadLookups, loadProperties]
   );
 
-  // Chuyen nhanh giua cac tai khoan cau hinh san (menu 3 gach) — khong can dang xuat.
-  // Doi session xong, effect o duoi tu tai lai toan bo du lieu theo tai khoan moi.
+  // ===== Chuyen nhanh tai khoan (menu 3 gach) =====
+  // KHONG co mat khau nao trong APK. App chi nho nhung tai khoan da tung dang nhap
+  // TREN MAY NAY. Doi tai khoan = dung lai phien da luu -> tuc thi, khong can go gi.
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
   const [switchingAccount, setSwitchingAccount] = useState<string | null>(null);
+  const [addingAccount, setAddingAccount] = useState(false);
+
+  useEffect(() => {
+    void loadSavedAccounts().then(setSavedAccounts);
+  }, []);
+
+  const applySession = useCallback(async (nextSession: SessionState, password?: string) => {
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+    if (password) {
+      await AsyncStorage.setItem(
+        CREDS_KEY,
+        JSON.stringify({
+          username: nextSession.user.landsoft_username ?? nextSession.user.username,
+          password,
+        })
+      );
+    }
+    setSavedAccounts(await rememberAccount(nextSession.user, nextSession.token, password));
+    setSelectedPropertyId(null);
+    setSession(nextSession);
+  }, []);
+
   const handleSwitchAccount = useCallback(
-    async (account: QuickAccount) => {
-      if (isSameAccount(session?.user.landsoft_username ?? session?.user.username, account)) {
+    async (account: SavedAccount) => {
+      const current = session?.user.landsoft_username ?? session?.user.username;
+      if (sameUser(current, account.username)) {
         return;
       }
       setSwitchingAccount(account.username);
       try {
-        const response = await login({ username: account.username, password: account.password });
-        const nextSession = { token: response.access_token, user: response.user };
-        await AsyncStorage.multiSet([
-          [SESSION_KEY, JSON.stringify(nextSession)],
-          [CREDS_KEY, JSON.stringify({ username: account.username, password: account.password })],
-        ]);
-        setSelectedPropertyId(null);
-        setSession(nextSession);
+        // 1) Thu dung lai phien da luu — nhanh nhat, khong can mat khau
+        try {
+          const user = await fetchMe(account.token);
+          await applySession({ token: account.token, user });
+          return;
+        } catch {
+          // phien het han (12h) -> sang buoc 2
+        }
+
+        // 2) Con nho mat khau tren may -> tu dang nhap lai, van khong phai go
+        if (account.password) {
+          const response = await login({ username: account.username, password: account.password });
+          setSavedAccounts(await updateAccountToken(account.username, response.access_token));
+          await applySession(
+            { token: response.access_token, user: response.user },
+            account.password
+          );
+          return;
+        }
+
+        // 3) Khong con gi -> nho nguoi dung dang nhap lai tai khoan do
+        Alert.alert(
+          "Phiên đã hết hạn",
+          `Tài khoản ${account.username} cần đăng nhập lại một lần.`,
+          [
+            { text: "Để sau", style: "cancel" },
+            { text: "Đăng nhập", onPress: () => setAddingAccount(true) },
+          ]
+        );
       } catch (error) {
         Alert.alert("Không chuyển được tài khoản", normalizeApiError(error));
       } finally {
         setSwitchingAccount(null);
       }
+    },
+    [session, applySession]
+  );
+
+  const handleForgetAccount = useCallback(
+    (account: SavedAccount) => {
+      const current = session?.user.landsoft_username ?? session?.user.username;
+      if (sameUser(current, account.username)) {
+        Alert.alert("Không xóa được", "Đây là tài khoản đang dùng. Hãy chuyển sang tài khoản khác trước.");
+        return;
+      }
+      Alert.alert("Xóa tài khoản đã lưu?", `${account.displayName} (${account.username})`, [
+        { text: "Không", style: "cancel" },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: () => void forgetAccount(account.username).then(setSavedAccounts),
+        },
+      ]);
     },
     [session]
   );
@@ -436,14 +508,12 @@ export default function App() {
         response = await login(payload);
       }
 
-      const nextSession = { token: response.access_token, user: response.user };
-      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
-      // Nho tai khoan de cac lan sau tu dang nhap, khong phai nhap lai
-      await AsyncStorage.setItem(
-        CREDS_KEY,
-        JSON.stringify({ username: payload.username, password: payload.password })
+      // Nho tai khoan tren MAY NAY de lan sau chuyen nhanh (khong nam trong file APK)
+      await applySession(
+        { token: response.access_token, user: response.user },
+        payload.password
       );
-      setSession(nextSession);
+      setAddingAccount(false);
     } catch (error) {
       Alert.alert("Đăng nhập thất bại", normalizeApiError(error));
     } finally {
@@ -508,7 +578,8 @@ export default function App() {
     );
   }
 
-  if (!session) {
+  // addingAccount: them tai khoan moi ma KHONG dang xuat tai khoan dang dung
+  if (!session || addingAccount) {
     return (
       <LoginScreen
         apiBaseUrlValue={apiBaseUrlInput}
@@ -517,6 +588,7 @@ export default function App() {
         onChangeApiBaseUrl={setApiBaseUrlInput}
         onUseEmulatorApiBaseUrl={() => setApiBaseUrlInput(EMULATOR_API_BASE_URL)}
         onLogin={handleLogin}
+        onCancel={session ? () => setAddingAccount(false) : undefined}
       />
     );
   }
@@ -640,9 +712,14 @@ export default function App() {
           setMenuOpen(false);
           void handleLogout();
         }}
-        accounts={QUICK_ACCOUNTS}
+        accounts={savedAccounts}
         switchingAccount={switchingAccount}
         onSwitchAccount={(account) => void handleSwitchAccount(account)}
+        onAddAccount={() => {
+          setMenuOpen(false);
+          setAddingAccount(true);
+        }}
+        onForgetAccount={handleForgetAccount}
       />
     </SafeAreaView>
   );

@@ -14,6 +14,7 @@ export function LoginScreen({
   onChangeApiBaseUrl,
   onUseEmulatorApiBaseUrl,
   onLogin,
+  onCancel,
 }: {
   apiBaseUrlValue: string;
   showApiSettings: boolean;
@@ -21,6 +22,8 @@ export function LoginScreen({
   onChangeApiBaseUrl: (value: string) => void;
   onUseEmulatorApiBaseUrl: () => void;
   onLogin: (payload: LoginPayload) => Promise<void>;
+  /** Co gia tri khi dang THEM tai khoan (van con tai khoan dang dung) */
+  onCancel?: () => void;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -80,6 +83,12 @@ export function LoginScreen({
         >
           <Text style={styles.primaryButtonText}>{loading ? "Đang đăng nhập..." : "Đăng nhập"}</Text>
         </Pressable>
+        {onCancel ? (
+          <Pressable style={styles.loginCancelButton} disabled={loading} onPress={onCancel}>
+            <Feather name="arrow-left" size={15} color="#5B6B85" />
+            <Text style={styles.loginCancelText}>Quay lại tài khoản đang dùng</Text>
+          </Pressable>
+        ) : null}
       </View>
     </SafeAreaView>
   );
