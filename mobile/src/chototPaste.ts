@@ -148,6 +148,8 @@ function findFreeformAddressLine(lines: string[], lookups: LookupCollections): s
     return line
       .replace(/\s+(?=(?:p|phường|phuong|xã|xa)\.?\s*\d)/gi, ", ")
       .replace(/\s+(?=(?:phường|phuong)\s+\p{L})/giu, ", ")
+      // Phuong viet tat bang CHU: "... p cầu ông lãnh q1", "... p đakao q1"
+      .replace(/\s+(?=p\s+\p{Ll})/gu, ", ")
       .replace(/\s+(?=(?:q|quận|quan)\.?\s*\d)/gi, ", ")
       .replace(/\s+(?=(?:quận|quan|huyện|huyen)\s+\p{L})/giu, ", ");
   }
@@ -401,6 +403,20 @@ export function parseChototListing(
       // Giu nguyen format nhu trong tin (ke ca dau cham) — giong Landsoft luu SDT
       patch.contact_phone = phoneMatch[1].trim();
       filled.push("SĐT");
+
+      // Ten chu nha thuong viet NGAY SAU SDT: "0764092288 a hiệp", "0933757368 C phượng".
+      // Giu nguyen cach viet cua nguon (Landsoft cung luu kieu "a Hoàng", "Cô Châu").
+      if (!patch.owner_name) {
+        const line = (text || "")
+          .split(/\r?\n/)
+          .find((l) => l.includes(phoneMatch[1].trim()));
+        const after = line?.split(phoneMatch[1].trim())[1]?.trim() ?? "";
+        const name = after.replace(/^[-–—:.,]+\s*/, "").split(/[,\n]/)[0].trim();
+        if (name && name.length <= 40 && /\p{L}/u.test(name)) {
+          patch.owner_name = name;
+          filled.push(`chủ nhà (${name})`);
+        }
+      }
     }
   }
 
@@ -516,6 +532,85 @@ export function splitChototMessages(text: string): string[] {
   }
   flush();
   return blocks.map((block) => block.join("\n"));
+}
+
+/**
+ * Tach van ban kieu "nguon nha gui qua Zalo" thanh tung can. Moi can co dang:
+ *   40/17/3 Lam Sơn p6 Q Bình Thạnh
+ *   5 x 22
+ *   Giá 21 tỷ
+ *   0764092288 a Hiệp
+ * -> ket thuc mot can khi gap dong CO SO DIEN THOAI. Cung chap nhan cach nhau
+ * bang dong trong hoac tieu de bot Telegram.
+ */
+export function splitBatchListings(text: string): string[] {
+  const blocks: string[][] = [];
+  let current: string[] = [];
+  const flush = () => {
+    if (current.some((line) => line.trim())) blocks.push(current);
+    current = [];
+  };
+
+  for (const rawLine of (text || "").split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    const norm = stripAccents(trimmed).replace(/^[^a-z0-9]+/, "");
+    if (TELEGRAM_MSG_HEADER.test(trimmed) || norm === "nha moi" || norm === "tin moi") {
+      flush();
+      continue;
+    }
+    if (!trimmed) {
+      flush();
+      continue;
+    }
+    current.push(rawLine);
+    // Dong chua SDT => het mot can
+    if (/(?:^|[^\d])(0\d[\d.\s]{7,12}\d)(?:[^\d]|$)/.test(trimmed.replace(/\s+/g, " "))) {
+      flush();
+    }
+  }
+  flush();
+  return blocks.map((block) => block.join("\n"));
+}
+
+/** Parse nhieu can cung luc tu tin nhan nguon nha (form anh Dũng). */
+export function parseBatchListings(
+  text: string,
+  lookups: LookupCollections
+): ChototListingOption[] {
+  const options: ChototListingOption[] = [];
+  const seen = new Set<string>();
+  for (const block of splitBatchListings(text)) {
+    const result = parseChototListing(block, lookups);
+    // Toi thieu phai co dia chi hoac gia thi moi tinh la mot can
+    if (!result.patch.address && !result.patch.street_name && !result.patch.price) continue;
+
+    const patch = { ...result.patch };
+    // Giu nguyen tin goc vao Dien giai de khong mat thong tin nao
+    patch.description = block.trim();
+    patch.title = "";
+
+    const districtLabel = patch.district_code
+      ? lookups.districts.find((d) => d.code === patch.district_code)?.label
+      : undefined;
+    const place = [patch.address, patch.street_name].filter(Boolean).join(" ");
+    const subtitleParts: string[] = [];
+    if (districtLabel) subtitleParts.push(districtLabel);
+    if (patch.width && patch.length) subtitleParts.push(`${patch.width}x${patch.length}m`);
+    if (patch.price) subtitleParts.push(`${patch.price} tỷ`);
+    if (patch.contact_phone) subtitleParts.push(patch.contact_phone);
+
+    const dedupKey = stripAccents(`${place}|${patch.price ?? ""}|${patch.contact_phone ?? ""}`);
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
+
+    options.push({
+      title: place || "(chưa rõ địa chỉ)",
+      subtitle: subtitleParts.join(" · "),
+      patch,
+      filled: result.filled,
+    });
+  }
+  return options;
 }
 
 // Parse van ban co the chua NHIEU tin -> danh sach tin hop le de nguoi dung chon.

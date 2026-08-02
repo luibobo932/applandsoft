@@ -982,17 +982,18 @@ class SqlLandsoftGateway:
             return {"landsoft_id": landsoft_id, "message": "Đã cập nhật trạng thái vào Landsoft"}
 
     def add_property_note(self, landsoft_id: int, content: str, actor: AuthenticatedUser) -> dict:
+        # Ghi DUNG NHU DESKTOP: vao mglbcLichSu.DienGiai, chi noi dung nguoi dung go,
+        # khong them tien to nao (desktop luu kieu 'Xuống 17,5 Tỷ', 'đã bán'...).
         with open_sql_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO dbo.mglbcNhatKyXuLy (NgayXL, TieuDe, NoiDung, KetQua, MaNVG, MaNVN, MaPT, MaBC)
-                VALUES (GETDATE(), N'Ghi chú mobile', ?, NULL, ?, ?, NULL, ?)
+                INSERT INTO dbo.mglbcLichSu (MaBC, NgayTH, MaTT, DienGiai, MaNV)
+                VALUES (?, GETDATE(), NULL, ?, ?)
                 """,
+                landsoft_id,
                 content,
                 actor.landsoft_user_id,
-                actor.landsoft_user_id,
-                landsoft_id,
             )
             conn.commit()
             return {"landsoft_id": landsoft_id, "message": "Đã thêm ghi chú vào Landsoft"}
@@ -1155,15 +1156,15 @@ class SqlLandsoftGateway:
                 )
 
                 if note:
+                    # Giong desktop: ghi chu vao mglbcLichSu.DienGiai, khong tien to
                     cursor.execute(
                         """
-                        INSERT INTO dbo.mglbcNhatKyXuLy (NgayXL, TieuDe, NoiDung, KetQua, MaNVG, MaNVN, MaPT, MaBC)
-                        VALUES (GETDATE(), N'Ghi chú mobile', ?, NULL, ?, ?, NULL, ?)
+                        INSERT INTO dbo.mglbcLichSu (MaBC, NgayTH, MaTT, DienGiai, MaNV)
+                        VALUES (?, GETDATE(), NULL, ?, ?)
                         """,
+                        landsoft_id,
                         note,
                         actor.landsoft_user_id,
-                        actor.landsoft_user_id,
-                        landsoft_id,
                     )
 
                 conn.commit()

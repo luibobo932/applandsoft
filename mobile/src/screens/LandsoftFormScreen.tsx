@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { Field, Section, SelectField } from "../components/shared";
@@ -12,6 +12,7 @@ import { checkHouseNumber, checkPhone, cleanPhoneCompare, createProperty, fetchN
 import {
   ChototListingOption,
   chototFieldDefaults,
+  parseBatchListings,
   parseChototMulti,
 } from "../chototPaste";
 import { LookupCollections, LookupItem, PropertyCreatePayload } from "../types";
@@ -28,6 +29,12 @@ function stripAccents(s: string): string {
 }
 
 const CREATE_DRAFT_KEY = "landsoft_mobile_create_draft";
+const QUEUE_KEY = "landsoft_mobile_create_queue";
+
+// Khung rong cho 1 can trong hang cho (cac gia tri co dinh se duoc effect mac dinh dien)
+function emptyQueueItem(): PropertyCreatePayload {
+  return { ...chototFieldDefaults, brokerage_percent: 1 } as PropertyCreatePayload;
+}
 
 // O nhap so co nhan, dung chung trong cac luoi
 function NumField({
@@ -400,6 +407,190 @@ export function LandsoftFormScreen({
     );
   };
 
+  // Ap cac gia tri CO DINH (Hang Hot / Khao sat thuc te / So hong / Can ban / TP HCM /
+  // phi MG 1% / loai duong theo loai BDS) cho can trong hang cho — vi chung khong di
+  // qua form nen khong duoc effect mac dinh o tren dien ho.
+  const withFixedDefaults = useCallback(
+    (item: PropertyCreatePayload): PropertyCreatePayload => {
+      const next = { ...item };
+      if (!next.grade_code) {
+        next.grade_code = lookups.grades.find((g) => stripAccents(g.label).includes("hang hot"))?.code;
+      }
+      if (!next.source_code) {
+        next.source_code =
+          lookups.sources.find((x) => stripAccents(x.label).includes("khao sat"))?.code ?? next.source_code;
+      }
+      if (!next.legal_status_code) {
+        next.legal_status_code = lookups.legal_statuses.find((x) =>
+          stripAccents(x.label).includes("so hong")
+        )?.code;
+      }
+      if (!next.province_code && hcmProvinceCode) next.province_code = hcmProvinceCode;
+      if (next.listing_type !== "ban") next.listing_type = "ban";
+      if (!next.brokerage_percent) next.brokerage_percent = 1;
+      if (!next.road_type_code && next.property_type_code) {
+        const typeLabel = stripAccents(
+          lookups.property_types.find((t) => t.code === next.property_type_code)?.label ?? ""
+        );
+        const key = typeLabel.includes("mat tien") ? "mat tien" : typeLabel.includes("hem") ? "hem lon" : "";
+        if (key) {
+          next.road_type_code = lookups.road_types.find((r) => stripAccents(r.label).includes(key))?.code;
+        }
+      }
+      return next;
+    },
+    [lookups, hcmProvinceCode]
+  );
+
+  // ===== HANG CHO: dien san nhieu can, bam Luu tat ca moi day len Landsoft =====
+  // Giu nguyen tu duy form nhap nha: form van la noi nhap/sua 1 can, hang cho chi
+  // la cho "de tam" cac can da dien xong.
+  const [queue, setQueue] = useState<PropertyCreatePayload[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [savingAll, setSavingAll] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(QUEUE_KEY)
+      .then((raw) => {
+        if (raw) setQueue(JSON.parse(raw));
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const persistQueue = (next: PropertyCreatePayload[]) => {
+    setQueue(next);
+    void AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(next));
+  };
+
+  const queueLabel = (item: PropertyCreatePayload): string =>
+    [item.address, item.street_name].filter(Boolean).join(" ") || "(chưa rõ địa chỉ)";
+
+  const missingOf = (item: PropertyCreatePayload): string[] => {
+    const missing: string[] = [];
+    if (!item.address?.trim()) missing.push("số nhà");
+    if (!item.street_name?.trim()) missing.push("tên đường");
+    if (!item.district_code) missing.push("quận");
+    if (!item.ward_code) missing.push("phường");
+    if (!item.owner_name?.trim()) missing.push("tên chủ");
+    if (!item.contact_phone?.trim()) missing.push("SĐT");
+    if (!item.price || item.price <= 0) missing.push("giá");
+    if (!item.area || item.area <= 0) missing.push("ngang/dài");
+    return missing;
+  };
+
+  // Dan NHIEU can tu tin nhan nguon nha (form anh Dũng) -> day thang vao hang cho
+  const pasteBatch = async () => {
+    let pasted = "";
+    try {
+      pasted = await Clipboard.getStringAsync();
+    } catch {
+      pasted = "";
+    }
+    if (!pasted.trim()) {
+      Alert.alert("Clipboard trống", "Hãy copy tin nguồn nhà (Zalo/Telegram) rồi bấm lại nút này.");
+      return;
+    }
+    const items = parseBatchListings(pasted, lookups);
+    if (items.length === 0) {
+      Alert.alert("Không đọc được căn nào", "Kiểm tra lại nội dung đã copy (cần có địa chỉ / giá / SĐT).");
+      return;
+    }
+    const next = [
+      ...queue,
+      ...items.map((it) => withFixedDefaults({ ...emptyQueueItem(), ...it.patch })),
+    ];
+    persistQueue(next);
+    const thieu = items.filter((it) => missingOf({ ...emptyQueueItem(), ...it.patch }).length > 0).length;
+    Alert.alert(
+      `Đã thêm ${items.length} căn vào hàng chờ`,
+      `Tổng hàng chờ: ${next.length} căn.` +
+        (thieu ? `\n\n${thieu} căn còn thiếu thông tin — chạm vào căn đó để bổ sung trước khi lưu.` : "")
+    );
+  };
+
+  // Dua can dang nhap tren form vao hang cho (hoac cap nhat can dang sua)
+  const addCurrentToQueue = () => {
+    const error = validate();
+    if (error) {
+      Alert.alert("Chưa đủ dữ liệu", error);
+      return;
+    }
+    if (editingIndex !== null) {
+      const next = [...queue];
+      next[editingIndex] = { ...draft };
+      persistQueue(next);
+      setEditingIndex(null);
+      Alert.alert("Đã cập nhật", `Căn ${queueLabel(draft)} trong hàng chờ.`);
+    } else {
+      persistQueue([...queue, { ...draft }]);
+      Alert.alert("Đã thêm vào hàng chờ", `${queueLabel(draft)}\n\nTổng: ${queue.length + 1} căn.`);
+    }
+    onChangeDraft({ ...chototFieldDefaults, brokerage_percent: 1 });
+  };
+
+  const editQueueItem = (index: number) => {
+    onChangeDraft({ ...chototFieldDefaults, ...queue[index] });
+    setEditingIndex(index);
+  };
+
+  const removeQueueItem = (index: number) => {
+    Alert.alert("Xóa khỏi hàng chờ?", queueLabel(queue[index]), [
+      { text: "Không", style: "cancel" },
+      {
+        text: "Xóa",
+        style: "destructive",
+        onPress: () => {
+          persistQueue(queue.filter((_, i) => i !== index));
+          if (editingIndex === index) setEditingIndex(null);
+        },
+      },
+    ]);
+  };
+
+  // Luu TAT CA can trong hang cho len Landsoft
+  const saveAllQueue = () => {
+    const chuaDu = queue.filter((item) => missingOf(item).length > 0);
+    if (chuaDu.length > 0) {
+      Alert.alert(
+        "Còn căn thiếu thông tin",
+        `${chuaDu.length} căn chưa đủ dữ liệu:\n${chuaDu
+          .slice(0, 5)
+          .map((it) => `• ${queueLabel(it)}: thiếu ${missingOf(it).join(", ")}`)
+          .join("\n")}\n\nChạm vào từng căn để bổ sung rồi lưu lại.`
+      );
+      return;
+    }
+    Alert.alert("Lưu tất cả?", `Đăng ${queue.length} căn lên Landsoft. Tiếp tục?`, [
+      { text: "Không", style: "cancel" },
+      { text: `Lưu ${queue.length} căn`, onPress: () => void doSaveAll() },
+    ]);
+  };
+
+  const doSaveAll = async () => {
+    setSavingAll(true);
+    const choDuyet = lookups.statuses.find((s) => (s.label ?? "").toLowerCase().includes("duy"));
+    const statusCode = choDuyet?.code ?? lookups.statuses[0]?.code ?? "2";
+    const failed: PropertyCreatePayload[] = [];
+    let ok = 0;
+    for (const item of queue) {
+      try {
+        await createProperty(token, { ...withFixedDefaults(item), status_code: statusCode, title: "" });
+        ok += 1;
+      } catch {
+        failed.push(item);
+      }
+    }
+    persistQueue(failed);
+    setEditingIndex(null);
+    setSavingAll(false);
+    Alert.alert(
+      failed.length === 0 ? "Đã lưu tất cả" : "Lưu xong (có căn lỗi)",
+      `Thành công: ${ok} căn.` +
+        (failed.length ? `\nLỗi: ${failed.length} căn — vẫn còn trong hàng chờ để thử lại.` : "")
+    );
+    if (ok > 0) await onSubmitSuccess();
+  };
+
   const pasteFromChotot = async () => {
     let pasted = "";
     try {
@@ -507,14 +698,78 @@ export function LandsoftFormScreen({
       </View>
       <Text style={styles.lsFormSubtitle}>Nhập nhà mới — lưu thẳng vào hệ thống HomeApp</Text>
 
-      <Pressable style={styles.chototPasteButton} onPress={() => void pasteFromChotot()}>
-        <Feather name="clipboard" size={16} color="#ffffff" />
-        <Text style={styles.chototPasteButtonText}>Dán tin Chợ Tốt</Text>
-      </Pressable>
+      <View style={styles.pasteRow}>
+        <Pressable style={styles.pasteBatchButton} onPress={() => void pasteBatch()}>
+          <Feather name="layers" size={16} color="#ffffff" />
+          <Text style={styles.chototPasteButtonText}>Dán nhiều căn</Text>
+        </Pressable>
+        <Pressable style={styles.pasteSingleButton} onPress={() => void pasteFromChotot()}>
+          <Feather name="clipboard" size={16} color="#15428B" />
+          <Text style={styles.pasteSingleButtonText}>Dán 1 tin</Text>
+        </Pressable>
+      </View>
       <Text style={styles.chototPasteHint}>
-        Copy tin nhà từ bot Telegram rồi bấm nút — app tự điền địa chỉ, quận/phường, giá, diện tích.
-        Copy nhiều tin cùng lúc sẽ hiện danh sách để chọn.
+        Copy cả loạt tin nguồn nhà (Zalo/Telegram) rồi bấm "Dán nhiều căn" — app tách từng căn
+        vào hàng chờ. Kiểm tra xong bấm "Lưu tất cả" mới chính thức đăng lên.
       </Text>
+
+      {/* ===== HANG CHO: cac can da dien san, chua day len Landsoft ===== */}
+      {queue.length > 0 ? (
+        <View style={styles.queueBox}>
+          <View style={styles.queueHeader}>
+            <Text style={styles.queueTitle}>Hàng chờ · {queue.length} căn</Text>
+            <Pressable onPress={() => persistQueue([])}>
+              <Text style={styles.queueClear}>Xóa hết</Text>
+            </Pressable>
+          </View>
+          {queue.map((item, index) => {
+            const missing = missingOf(item);
+            const active = editingIndex === index;
+            return (
+              <Pressable
+                key={`${queueLabel(item)}-${index}`}
+                style={[styles.queueItem, active && styles.queueItemActive]}
+                onPress={() => editQueueItem(index)}
+                onLongPress={() => removeQueueItem(index)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.queueItemTitle} numberOfLines={1}>
+                    {index + 1}. {queueLabel(item)}
+                  </Text>
+                  <Text style={styles.queueItemSub} numberOfLines={1}>
+                    {[
+                      item.price ? `${item.price} tỷ` : null,
+                      item.width && item.length ? `${item.width}x${item.length}m` : null,
+                      item.contact_phone,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                  {missing.length > 0 ? (
+                    <Text style={styles.queueItemMissing}>⚠ Thiếu: {missing.join(", ")}</Text>
+                  ) : (
+                    <Text style={styles.queueItemReady}>✓ Đủ thông tin</Text>
+                  )}
+                </View>
+                <Pressable style={styles.queueRemove} onPress={() => removeQueueItem(index)}>
+                  <Feather name="x" size={16} color="#C0392B" />
+                </Pressable>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            style={[styles.queueSaveAll, savingAll && styles.buttonDisabled]}
+            disabled={savingAll}
+            onPress={saveAllQueue}
+          >
+            <Feather name="upload-cloud" size={17} color="#ffffff" />
+            <Text style={styles.queueSaveAllText}>
+              {savingAll ? "Đang lưu..." : `Lưu tất cả ${queue.length} căn`}
+            </Text>
+          </Pressable>
+          <Text style={styles.queueHint}>Chạm một căn để sửa · Giữ lâu để xóa</Text>
+        </View>
+      ) : null}
 
       {/* ===== KHACH HANG: chi Ho ten + Di dong theo yeu cau ===== */}
       <View style={styles.wfGroup}>
@@ -700,6 +955,13 @@ export function LandsoftFormScreen({
         </WfRow>
       </View>
 
+      <Pressable style={styles.addToQueueButton} onPress={addCurrentToQueue}>
+        <Feather name={editingIndex !== null ? "check" : "plus"} size={16} color="#15428B" />
+        <Text style={styles.addToQueueText}>
+          {editingIndex !== null ? `Cập nhật căn #${editingIndex + 1} trong hàng chờ` : "Thêm vào hàng chờ"}
+        </Text>
+      </Pressable>
+
       <View style={styles.wfBtnRow}>
         <Pressable
           style={[styles.wfBtn, styles.wfBtnPrimary, submitting && styles.buttonDisabled]}
@@ -707,7 +969,7 @@ export function LandsoftFormScreen({
           onPress={() => void submit()}
         >
           <Feather name="save" size={16} color="#1F3B70" />
-          <Text style={styles.wfBtnText}>{submitting ? "Đang lưu..." : "Lưu"}</Text>
+          <Text style={styles.wfBtnText}>{submitting ? "Đang lưu..." : "Lưu ngay"}</Text>
         </Pressable>
         <Pressable
           style={styles.wfBtn}
