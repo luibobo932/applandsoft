@@ -18,9 +18,15 @@ backend/data/server_bootstrap/
 backend/data/push_subscriptions.json
 backend/data/telegram_landsoft_call_report_state.json
 
+# Keystore ky APK — MAT NO LA KHONG CAP NHAT DUOC APP NUA, tuyet doi khong commit
+*.jks
+*.keystore
+!mobile/android/app/debug.keystore
+
 # Mobile local data
 mobile/node_modules/
 mobile/.expo/
+mobile/coverage/
 mobile/.env
 mobile/.env.local
 mobile/.env*.local
@@ -37,6 +43,11 @@ runtime/*.json
 
 # Local git backups
 _git-backup/
+
+# Tai lieu / anh chup man hinh sinh ra tren may, khong can dua len GitHub
+_docgen/
+Landsoft_Mobile_Tai_Lieu_Du_An.docx
+chknow.png
 
 # Trang thai rieng cua watchdog (khong commit - doi lien tuc, ~700KB)
 backend/data/status_watch.db

@@ -38,4 +38,7 @@ yarn-error.*
 
 # generated native folders
 /ios
-/android
+
+# android/ CO trong git (xem android/.gitignore cho phan build tam):
+# versionCode va cau hinh ky APK nam trong android/app/build.gradle nen phai theo git,
+# neu khong thi GitHub Actions khong build duoc APK va moi ban deu la versionCode 1.
