@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 
+import { APP_VERSION } from "../appVersion";
 import { styles } from "../styles";
 import { cleanDisplayText } from "../utils";
 import { SavedAccount, sameUser } from "../savedAccounts";
@@ -182,6 +183,7 @@ export function LandsoftDrawer({
             <Feather name="log-out" size={19} color="#C0392B" />
             <Text style={[styles.drawerItemText, { color: "#C0392B" }]}>Đăng xuất</Text>
           </Pressable>
+          <Text style={styles.drawerVersion}>Phiên bản {APP_VERSION}</Text>
         </View>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
       </View>
