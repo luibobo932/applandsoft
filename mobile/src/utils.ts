@@ -120,7 +120,11 @@ export function isConnectivityFailure(message?: string | null): boolean {
 export function normalizeApiError(error: unknown): string {
   if (error instanceof Error) {
     if (isConnectivityFailure(error.message)) {
-      return "Không kết nối được tới backend. Nếu đang test trên emulator, bấm nút 'Máy này' dưới ô API backend rồi đăng nhập lại.";
+      // Ban that tren dien thoai: noi tieng nguoi. Cau nhac ve emulator chi co ich
+      // cho ban dev, de nguyen trong APK phat cho nhan vien thi chi lam ho roi tri.
+      return __DEV__
+        ? "Không kết nối được tới backend. Nếu đang test trên emulator, bấm nút 'Máy này' dưới ô API backend rồi đăng nhập lại."
+        : "Không kết nối được tới máy chủ. Kiểm tra mạng rồi thử lại.";
     }
     return error.message;
   }

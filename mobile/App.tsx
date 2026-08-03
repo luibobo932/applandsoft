@@ -14,6 +14,7 @@ import {
   login,
   registerUnauthorizedHandler,
 } from "./src/api";
+import { BOOT_TIMEOUT_MESSAGE, isTransientBootFailure } from "./src/bootFailure";
 import { defaultApiBaseUrl, getApiBaseUrl, setApiBaseUrl } from "./src/config";
 import { AppHeader, LandsoftDrawer, LandsoftView } from "./src/components/shared";
 import {
@@ -69,7 +70,13 @@ const LOGGED_OUT_KEY = "landsoft_mobile_logged_out";
 const DEBUG_AUTO_LOGIN_USER = process.env.EXPO_PUBLIC_DEBUG_AUTO_LOGIN_USER?.trim();
 const DEBUG_AUTO_LOGIN_PASSWORD = process.env.EXPO_PUBLIC_DEBUG_AUTO_LOGIN_PASSWORD?.trim();
 const EMULATOR_API_BASE_URL = process.env.EXPO_PUBLIC_DEBUG_EMULATOR_API_BASE_URL?.trim() ?? "";
-const BOOT_REQUEST_TIMEOUT_MS = 18000;
+// Kiem tra token cu: cho ngan thoi, vi het gio van vao duoc app bang phien da luu.
+const SESSION_CHECK_TIMEOUT_MS = 8000;
+// Tu dang nhap lai: phai cho lau bang backend, khong co duong lui nao khac.
+// Render goi re ngu sau ~15 phut khong ai dung, thuc day mat 30-50s.
+const AUTO_LOGIN_TIMEOUT_MS = 50000;
+// Sau ngan nay ma chua xong thi noi cho nguoi dung biet la dang doi may chu, khong phai treo.
+const SLOW_BOOT_HINT_MS = 6000;
 // Man hinh goc: bam Back o day mot lan nua moi thoat app
 const HOME_TAB: LandsoftView = "properties";
 const EXIT_HINT_WINDOW_MS = 2000;
@@ -122,9 +129,9 @@ const emptyLookups: LookupCollections = {
   provinces: [],
 };
 
-function withBootTimeout<T>(promise: Promise<T>): Promise<T> {
+function withBootTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("BOOT_REQUEST_TIMEOUT")), BOOT_REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => reject(new Error(BOOT_TIMEOUT_MESSAGE)), timeoutMs);
     promise.then(
       (value) => {
         clearTimeout(timer);
@@ -166,6 +173,7 @@ function getPreferredApiBaseUrl(storedApiBaseUrl?: string | null): string {
 
 export default function App() {
   const [booting, setBooting] = useState(true);
+  const [slowBoot, setSlowBoot] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [session, setSession] = useState<SessionState | null>(null);
   const [lookups, setLookups] = useState<LookupCollections>(emptyLookups);
@@ -274,13 +282,30 @@ export default function App() {
       let activeSession: SessionState | null = null;
 
       // 1. Dung lai phien da luu neu token con han
-      if (storedSession) {
+      let savedSession: SessionState | null = null;
+      try {
+        savedSession = storedSession ? (JSON.parse(storedSession) as SessionState) : null;
+      } catch {
+        savedSession = null;
+      }
+
+      if (savedSession?.token) {
         try {
-          const parsed: SessionState = JSON.parse(storedSession);
-          const currentUser = await withBootTimeout(fetchMe(parsed.token));
-          activeSession = { token: parsed.token, user: currentUser };
-        } catch {
-          await AsyncStorage.removeItem(SESSION_KEY);
+          const currentUser = await withBootTimeout(
+            fetchMe(savedSession.token),
+            SESSION_CHECK_TIMEOUT_MS
+          );
+          activeSession = { token: savedSession.token, user: currentUser };
+        } catch (error) {
+          if (isTransientBootFailure(error) && savedSession.user) {
+            // Backend chua thuc day: vao thang app bang phien cu (kem du lieu cache)
+            // thay vi bat nguoi dung ngoi nhin man hinh cho. Neu token hong that thi
+            // request dau tien se tra 401 va app tu dang nhap lai.
+            activeSession = savedSession;
+          } else {
+            // Backend tra loi that (token het han) -> bo phien, xuong buoc 2 dang nhap lai
+            await AsyncStorage.removeItem(SESSION_KEY);
+          }
         }
       }
 
@@ -300,11 +325,18 @@ export default function App() {
         const password = creds?.password;
         if (username && password) {
           try {
-            const response = await withBootTimeout(login({ username, password }));
+            const response = await withBootTimeout(
+              login({ username, password }),
+              AUTO_LOGIN_TIMEOUT_MS
+            );
             activeSession = { token: response.access_token, user: response.user };
             await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(activeSession));
-          } catch {
-            await AsyncStorage.removeItem(CREDS_KEY);
+          } catch (error) {
+            // Chi quen tai khoan khi backend that su TU CHOI (sai mat khau).
+            // Mat mang / may chu dang ngu thi giu nguyen de lan mo sau con tu vao duoc.
+            if (!isTransientBootFailure(error)) {
+              await AsyncStorage.removeItem(CREDS_KEY);
+            }
           }
         }
       }
@@ -338,6 +370,17 @@ export default function App() {
     void hydrateSession();
   }, [hydrateSession]);
 
+  // Khoi dong lau (backend Render dang thuc day) -> doi chu de nguoi dung biet
+  // la dang cho may chu chu khong phai app treo.
+  useEffect(() => {
+    if (!booting) {
+      setSlowBoot(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlowBoot(true), SLOW_BOOT_HINT_MS);
+    return () => clearTimeout(timer);
+  }, [booting]);
+
   const persistApiBaseUrl = useCallback(async (nextValue: string) => {
     const normalized = setApiBaseUrl(nextValue);
     setApiBaseUrlInput(normalized);
@@ -357,8 +400,11 @@ export default function App() {
     void cacheLookups(merged);
   }, []);
 
+  // Theo doi so can da tai de tinh trang ke tiep ma khong can dua properties vao deps
+  const loadedCountRef = useRef(0);
+
   const loadProperties = useCallback(
-    async (token: string, nextFilters: PropertyFilters) => {
+    async (token: string, nextFilters: PropertyFilters, silent = false) => {
       setPropertyLoading(true);
       try {
         const response = await fetchProperties(token, nextFilters);
@@ -368,6 +414,11 @@ export default function App() {
           void cacheProperties(response.items, response.total);
         }
       } catch (error) {
+        // Lan tu lam moi ngay sau khi mo app: mat mang / may chu chua day thi im lang,
+        // danh sach cache van con day du. Chi bao loi khi nguoi dung tu bam tim/tai lai.
+        if (silent && isTransientBootFailure(error)) {
+          return;
+        }
         Alert.alert("Không tải được kho hàng", normalizeApiError(error));
       } finally {
         setPropertyLoading(false);
@@ -376,8 +427,6 @@ export default function App() {
     []
   );
 
-  // Theo doi so can da tai de tinh trang ke tiep ma khong can dua properties vao deps
-  const loadedCountRef = useRef(0);
   useEffect(() => {
     loadedCountRef.current = properties.length;
   }, [properties.length]);
@@ -426,21 +475,30 @@ export default function App() {
     }
   }, [filters, loadingMore, propertyLoading, propertyTotal, session]);
 
-  const loadActivity = useCallback(async (token: string) => {
+  const loadActivity = useCallback(async (token: string, silent = false) => {
     setActivityLoading(true);
     try {
       const response = await fetchActivity(token);
       setActivityItems(response);
     } catch (error) {
+      if (silent && isTransientBootFailure(error)) {
+        return;
+      }
       Alert.alert("Không tải được lịch sử", normalizeApiError(error));
     } finally {
       setActivityLoading(false);
     }
   }, []);
 
+  // Lam moi ngay sau khi mo app: chay ngam, khong bat nguoi dung tat hop thoai loi
+  // khi may chu chua thuc day hoac dien thoai dang mat song.
   const refreshAuthenticatedData = useCallback(
     async (token: string, nextFilters: PropertyFilters) => {
-      await Promise.all([loadLookups(token), loadProperties(token, nextFilters), loadActivity(token)]);
+      await Promise.all([
+        loadLookups(token).catch(() => undefined),
+        loadProperties(token, nextFilters, true),
+        loadActivity(token, true),
+      ]);
     },
     [loadActivity, loadLookups, loadProperties]
   );
@@ -675,7 +733,9 @@ export default function App() {
       <SafeAreaView style={styles.screenCenter}>
         <StatusBar style="dark" />
         <ActivityIndicator size="large" color="#F37021" />
-        <Text style={styles.bootText}>Đang khởi tạo app...</Text>
+        <Text style={styles.bootText}>
+          {slowBoot ? "Máy chủ đang khởi động, đợi chút..." : "Đang khởi tạo app..."}
+        </Text>
       </SafeAreaView>
     );
   }
