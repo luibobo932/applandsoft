@@ -1,0 +1,42 @@
+# Chay moi lan push/PR dong vao app: bat loi TypeScript va test truoc khi build APK,
+# de khong bao gio gui nham mot ban APK hong cho nhan vien.
+name: Mobile CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-ci.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Lay source
+        uses: actions/checkout@v4
+
+      - name: Cai Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Cai dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Kiem tra TypeScript
+        working-directory: mobile
+        run: npm run typecheck
+
+      - name: Chay test
+        working-directory: mobile
+        run: npm test

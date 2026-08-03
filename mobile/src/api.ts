@@ -103,33 +103,6 @@ function buildQuery(filters: PropertyFilters): string {
   return queryText ? `?${queryText}` : "";
 }
 
-function parseExactAddressKeyword(keyword?: string): { houseNumber: string; fullAddress: string } | null {
-  const cleaned = (keyword ?? "").trim();
-  const match = cleaned.match(/^(\d[\w./-]*)[\s,]+(.+?)$/u);
-  if (!match) {
-    return null;
-  }
-  const streetName = match[2].trim();
-  const hasLetter = Array.from(streetName).some(
-    (character) => character.toLocaleLowerCase("vi") !== character.toLocaleUpperCase("vi")
-  );
-  if (!hasLetter) {
-    return null;
-  }
-  return { houseNumber: match[1], fullAddress: cleaned };
-}
-
-function normalizeAddress(value?: string | null): string {
-  return (value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("vi")
-    .replace(/đ/g, "d")
-    .replace(/[.,]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
   return request<LoginResponse>("/auth/login", {
     method: "POST",
@@ -145,34 +118,11 @@ export async function fetchLookups(token: string): Promise<LookupCollections> {
   return request<LookupCollections>("/lookups", {}, token);
 }
 
+// Tim "so nha + ten duong" (VD "5A/1 Mai Hắc Đế") do BACKEND lo: SQL khop rieng
+// cot SoNha va ten duong (_parse_exact_address_keyword trong sql_gateway.py).
+// Truoc day app phai keo ve 5000 dong roi tu loc — rat nang voi Render goi re.
 export async function fetchProperties(token: string, filters: PropertyFilters): Promise<PagedPropertiesResponse> {
-  const exactAddress = parseExactAddressKeyword(filters.keyword);
-  if (!exactAddress) {
-    return request<PagedPropertiesResponse>(`/properties${buildQuery(filters)}`, {}, token);
-  }
-
-  // Tuong thich backend Render cu: lay ung vien theo so nha, roi loc dung dia chi day du tren app.
-  const candidateFilters: PropertyFilters = {
-    ...filters,
-    keyword: exactAddress.houseNumber,
-    page: 1,
-    page_size: 5000,
-  };
-  const response = await request<PagedPropertiesResponse>(
-    `/properties${buildQuery(candidateFilters)}`,
-    {},
-    token
-  );
-  const expectedAddress = normalizeAddress(exactAddress.fullAddress);
-  const exactItems = response.items.filter(
-    (item) => normalizeAddress(item.address) === expectedAddress
-  );
-  return {
-    items: exactItems,
-    page: 1,
-    page_size: exactItems.length || 1,
-    total: exactItems.length,
-  };
+  return request<PagedPropertiesResponse>(`/properties${buildQuery(filters)}`, {}, token);
 }
 
 export async function fetchPropertyDetail(token: string, landsoftId: number): Promise<PropertyDetail> {

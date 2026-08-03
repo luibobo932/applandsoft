@@ -1,0 +1,168 @@
+// Man hinh HomeApp (cac the chuc nang).
+import { StyleSheet } from "react-native";
+
+export const workspaceStyles = StyleSheet.create({
+  workspaceContent: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 28,
+  },
+  workspaceHero: {
+    borderRadius: 26,
+    padding: 18,
+    backgroundColor: "#17305D",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    marginBottom: 12,
+  },
+  workspaceHeroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: "#F37021",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  workspaceHeroText: {
+    flex: 1,
+  },
+  workspaceEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#F7B58D",
+    marginBottom: 5,
+  },
+  workspaceTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "800",
+    color: "#ffffff",
+  },
+  workspaceDescription: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#D7E2F2",
+  },
+  workspaceStats: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+  },
+  workspaceStatCard: {
+    flex: 1,
+    minHeight: 94,
+    borderRadius: 20,
+    padding: 14,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#DCE3EE",
+    justifyContent: "center",
+  },
+  workspaceStatValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#17305D",
+  },
+  workspaceStatLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  workspaceUserBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "#FFF4EC",
+    borderWidth: 1,
+    borderColor: "#FED7BA",
+    marginBottom: 18,
+  },
+  workspaceUserText: {
+    flex: 1,
+  },
+  workspaceUserName: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#17305D",
+  },
+  workspaceUserRole: {
+    marginTop: 2,
+    fontSize: 12,
+    color: "#7C5B48",
+  },
+  workspaceGroup: {
+    marginBottom: 20,
+  },
+  workspaceGroupTitle: {
+    marginBottom: 10,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#17305D",
+  },
+  workspaceModuleGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  workspaceModuleCard: {
+    flexGrow: 1,
+    flexBasis: "47%",
+    minHeight: 184,
+    borderRadius: 22,
+    padding: 14,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#DCE3EE",
+  },
+  workspaceModuleCardPressed: {
+    opacity: 0.72,
+  },
+  workspaceModuleIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+    marginBottom: 10,
+  },
+  workspaceModuleIconReady: {
+    backgroundColor: "#FFF1E7",
+  },
+  workspaceModuleTitle: {
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "800",
+    color: "#17305D",
+  },
+  workspaceModuleDescription: {
+    flex: 1,
+    marginTop: 5,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+  },
+  workspaceModuleFooter: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  workspaceModuleStatus: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94A3B8",
+  },
+  workspaceModuleStatusReady: {
+    color: "#F37021",
+  },
+});
