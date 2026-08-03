@@ -183,12 +183,18 @@ export default function App() {
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(() => getPreferredApiBaseUrl());
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleLogout = useCallback(async () => {
-    // Xoa ca creds da luu de khong tu dang nhap lai sau khi nguoi dung chu dong dang xuat.
-    // Dat co LOGGED_OUT_KEY de lan mo app sau KHONG tu vao tai khoan cau hinh san.
+  // Ket thuc phien. PHAI phan biet hai truong hop:
+  //  - "manual": nguoi dung tu bam Dang xuat -> dat co de lan mo app sau hien man
+  //    dang nhap, va xoa sach du lieu kho hang con dinh tren may.
+  //  - "expired": token het han (12h) nen backend tra 401 -> KHONG dat co, de app
+  //    tu dang nhap lai bang tai khoan cau hinh san nhu truoc; dat co o day se lam
+  //    hong han tinh nang "mo app la vao thang" moi khi token het han.
+  const endSession = useCallback(async (reason: "manual" | "expired") => {
     await AsyncStorage.multiRemove([SESSION_KEY, CREDS_KEY]);
-    await AsyncStorage.setItem(LOGGED_OUT_KEY, "1");
-    await clearOfflineCache();
+    if (reason === "manual") {
+      await AsyncStorage.setItem(LOGGED_OUT_KEY, "1");
+      await clearOfflineCache();
+    }
     setSession(null);
     setProperties([]);
     setPropertyTotal(0);
@@ -197,12 +203,14 @@ export default function App() {
     setActiveTab(HOME_TAB);
   }, []);
 
+  const handleLogout = useCallback(() => endSession("manual"), [endSession]);
+
   // Register 401 handler once so any expired token auto-logs out
   useEffect(() => {
     registerUnauthorizedHandler(() => {
-      void handleLogout();
+      void endSession("expired");
     });
-  }, [handleLogout]);
+  }, [endSession]);
 
   const title = useMemo(() => {
     if (activeTab === "workspace") {
