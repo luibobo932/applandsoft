@@ -84,11 +84,17 @@ jobs:
           LANDSOFT_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           LANDSOFT_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           chmod +x gradlew
-          GRADLE_VERSION_ARGS="-PappVersionCode=${{ 100 + github.run_number }} -PappVersionName=1.1.${{ github.run_number }}"
+          # LUU Y: bieu thuc cua GitHub Actions khong lam duoc phep cong, va cung dung
+          # viet cap ngoac nhon kep trong ghi chu — GitHub van coi do la bieu thuc va
+          # bao hong ca file workflow. Vi vay cong o day bang shell.
+          # +100 de chac chan lon hon versionCode 1 cua cac ban APK cu da cai tren may.
+          VERSION_CODE=$(( 100 + GITHUB_RUN_NUMBER ))
           ./gradlew generateCodegenArtifactsFromSchema --no-daemon
           ./gradlew :app:createBundleReleaseJsAndAssets --rerun-tasks --no-daemon
-          ./gradlew assembleRelease --no-daemon $GRADLE_VERSION_ARGS
+          ./gradlew assembleRelease --no-daemon \
+            -PappVersionCode="$VERSION_CODE" -PappVersionName="1.1.${GITHUB_RUN_NUMBER}"
 
       - name: Dat ten APK
         run: cp mobile/android/app/build/outputs/apk/release/app-release.apk landsoft-mobile-1.1.${{ github.run_number }}.apk
