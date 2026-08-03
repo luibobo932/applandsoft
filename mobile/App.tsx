@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, SafeAreaView, Text } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, Platform, SafeAreaView, Text, ToastAndroid } from "react-native";
 
 import {
   ApiError,
@@ -16,6 +16,13 @@ import {
 } from "./src/api";
 import { defaultApiBaseUrl, getApiBaseUrl, setApiBaseUrl } from "./src/config";
 import { AppHeader, LandsoftDrawer, LandsoftView } from "./src/components/shared";
+import {
+  cacheLookups,
+  cacheProperties,
+  clearOfflineCache,
+  isDefaultFilters,
+  loadOfflineCache,
+} from "./src/offlineCache";
 import { QUICK_ACCOUNTS, findQuickAccount } from "./src/quickAccounts";
 import {
   SavedAccount,
@@ -56,10 +63,16 @@ const SESSION_KEY = "landsoft_mobile_session";
 const CREDS_KEY = "landsoft_mobile_creds";
 const CREATE_DRAFT_KEY = "landsoft_mobile_create_draft";
 const API_BASE_URL_KEY = "landsoft_mobile_api_base_url";
+// Co "nguoi dung tu bam Dang xuat": chan tu dang nhap lai bang tai khoan cau hinh san
+// o lan mo app ke tiep. Xoa co ngay khi dang nhap/doi tai khoan thanh cong.
+const LOGGED_OUT_KEY = "landsoft_mobile_logged_out";
 const DEBUG_AUTO_LOGIN_USER = process.env.EXPO_PUBLIC_DEBUG_AUTO_LOGIN_USER?.trim();
 const DEBUG_AUTO_LOGIN_PASSWORD = process.env.EXPO_PUBLIC_DEBUG_AUTO_LOGIN_PASSWORD?.trim();
 const EMULATOR_API_BASE_URL = process.env.EXPO_PUBLIC_DEBUG_EMULATOR_API_BASE_URL?.trim() ?? "";
 const BOOT_REQUEST_TIMEOUT_MS = 18000;
+// Man hinh goc: bam Back o day mot lan nua moi thoat app
+const HOME_TAB: LandsoftView = "properties";
+const EXIT_HINT_WINDOW_MS = 2000;
 
 type SessionState = {
   token: string;
@@ -171,12 +184,17 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = useCallback(async () => {
-    // Xoa ca creds da luu de khong tu dang nhap lai sau khi nguoi dung chu dong dang xuat
+    // Xoa ca creds da luu de khong tu dang nhap lai sau khi nguoi dung chu dong dang xuat.
+    // Dat co LOGGED_OUT_KEY de lan mo app sau KHONG tu vao tai khoan cau hinh san.
     await AsyncStorage.multiRemove([SESSION_KEY, CREDS_KEY]);
+    await AsyncStorage.setItem(LOGGED_OUT_KEY, "1");
+    await clearOfflineCache();
     setSession(null);
     setProperties([]);
+    setPropertyTotal(0);
     setActivityItems([]);
     setSelectedPropertyId(null);
+    setActiveTab(HOME_TAB);
   }, []);
 
   // Register 401 handler once so any expired token auto-logs out
@@ -239,7 +257,11 @@ export default function App() {
         AsyncStorage.getItem(API_BASE_URL_KEY),
       ]);
       setApiBaseUrlInput(getPreferredApiBaseUrl(storedApiBaseUrl));
-      const storedCreds = await AsyncStorage.getItem(CREDS_KEY);
+      const [storedCreds, loggedOutFlag] = await Promise.all([
+        AsyncStorage.getItem(CREDS_KEY),
+        AsyncStorage.getItem(LOGGED_OUT_KEY),
+      ]);
+      const userLoggedOut = loggedOutFlag === "1";
 
       let activeSession: SessionState | null = null;
 
@@ -255,7 +277,8 @@ export default function App() {
       }
 
       // 2. Khong co phien hoac token het han -> tu dang nhap lai.
-      if (!activeSession) {
+      //    Nguoi dung vua bam "Dang xuat" thi KHONG tu dang nhap, phai hien man hinh dang nhap.
+      if (!activeSession && !userLoggedOut) {
         const savedCreds = storedCreds ? JSON.parse(storedCreds) : null;
         // Thu tu uu tien de "mo app la vao thang":
         //   1. Tai khoan dung lan cuoi (khong bi keo ve tai khoan khac)
@@ -279,6 +302,18 @@ export default function App() {
       }
 
       if (activeSession) {
+        // Hien ngay du lieu cua lan mo truoc de khong phai ngoi cho backend Render "thuc day".
+        // Mang ve toi dau se ghi de tu dong.
+        const cached = await loadOfflineCache();
+        if (cached) {
+          if (cached.lookups) {
+            setLookups({ ...emptyLookups, ...cached.lookups });
+          }
+          if (cached.properties.length > 0) {
+            setProperties(cached.properties);
+            setPropertyTotal(cached.total);
+          }
+        }
         setSession(activeSession);
       }
       if (storedDraft) {
@@ -309,7 +344,9 @@ export default function App() {
   const loadLookups = useCallback(async (token: string) => {
     const data = await fetchLookups(token);
     // Merge with emptyLookups so any missing key keeps its default []
-    setLookups({ ...emptyLookups, ...data });
+    const merged = { ...emptyLookups, ...data };
+    setLookups(merged);
+    void cacheLookups(merged);
   }, []);
 
   const loadProperties = useCallback(
@@ -319,6 +356,9 @@ export default function App() {
         const response = await fetchProperties(token, nextFilters);
         setProperties(response.items);
         setPropertyTotal(response.total);
+        if (isDefaultFilters(nextFilters)) {
+          void cacheProperties(response.items, response.total);
+        }
       } catch (error) {
         Alert.alert("Không tải được kho hàng", normalizeApiError(error));
       } finally {
@@ -411,6 +451,8 @@ export default function App() {
 
   const applySession = useCallback(async (nextSession: SessionState, password?: string) => {
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+    // Da dang nhap lai -> go co "tu bam Dang xuat" de lan sau mo app vao thang
+    await AsyncStorage.removeItem(LOGGED_OUT_KEY);
     if (password) {
       await AsyncStorage.setItem(
         CREDS_KEY,
@@ -548,6 +590,48 @@ export default function App() {
     }
     void refreshAuthenticatedData(session.token, filters);
   }, [refreshAuthenticatedData, session]);
+
+  // NUT BACK CUNG CUA ANDROID: truoc day bam Back o bat ky man nao cung thoat thang app.
+  // Thu tu lui: dong menu -> thoat man them tai khoan -> ve danh sach tu chi tiet can ->
+  // ve man goc tu cac tab khac -> o man goc phai bam 2 lan moi thoat.
+  const exitPressedAtRef = useRef(0);
+  useEffect(() => {
+    if (Platform.OS !== "android") {
+      return;
+    }
+    const onHardwareBack = (): boolean => {
+      if (menuOpen) {
+        setMenuOpen(false);
+        return true;
+      }
+      if (session && addingAccount) {
+        setAddingAccount(false);
+        return true;
+      }
+      if (selectedPropertyId && activeTab === "properties") {
+        setSelectedPropertyId(null);
+        return true;
+      }
+      if (session && activeTab !== HOME_TAB) {
+        setSelectedPropertyId(null);
+        setActiveTab(HOME_TAB);
+        return true;
+      }
+      if (!session) {
+        return false; // dang o man dang nhap -> cho thoat luon
+      }
+      const now = Date.now();
+      if (now - exitPressedAtRef.current < EXIT_HINT_WINDOW_MS) {
+        return false; // bam lan 2 -> thoat that
+      }
+      exitPressedAtRef.current = now;
+      ToastAndroid.show("Bấm Back lần nữa để thoát HomeApp", ToastAndroid.SHORT);
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener("hardwareBackPress", onHardwareBack);
+    return () => subscription.remove();
+  }, [activeTab, addingAccount, menuOpen, selectedPropertyId, session]);
 
   const handleQuickViewPhone = useCallback(
     async (landsoftId: number) => {
