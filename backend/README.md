@@ -36,8 +36,8 @@ SQL_PORT=1433
 SQL_DATABASE=<database>
 SQL_USERNAME=<username>
 SQL_PASSWORD=<password>
-SQL_ENCRYPT=no
-SQL_TRUST_SERVER_CERT=yes
+SQL_ENCRYPT=yes                      # ma hoa duong truyen (TLS)
+SQL_TRUST_SERVER_CERT=yes            # chap nhan cert self-signed cua SQL noi bo
 ```
 
 Neu deploy len Linux/container, dung:

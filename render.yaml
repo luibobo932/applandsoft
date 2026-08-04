@@ -25,7 +25,8 @@ services:
         sync: false
       - key: SQL_PASSWORD
         sync: false
+      # Ma hoa duong truyen SQL (TLS); van tin cert self-signed cua SQL Server noi bo.
       - key: SQL_ENCRYPT
-        value: "no"
+        value: "yes"
       - key: SQL_TRUST_SERVER_CERT
         value: "yes"
