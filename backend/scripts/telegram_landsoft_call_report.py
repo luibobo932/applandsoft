@@ -30,6 +30,7 @@ WATCHED_EMPLOYEES = {
     120: "Nguyễn Hửu Lợi",
     426: "Nguyễn Viết Ca",
     486: "Nguyễn Thái Thư",  # SKL-469
+    98: "Thái Trung Tín",  # SKL-089
 }
 
 STATE_FILE = ROOT_DIR / "data" / "telegram_landsoft_call_report_state.json"
