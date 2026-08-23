@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from pathlib import Path
 
 from app.core.config import get_settings
 from app.db.sqlserver import open_sql_connection

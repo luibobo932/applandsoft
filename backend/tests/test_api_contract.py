@@ -52,6 +52,27 @@ def test_login_fail() -> None:
     assert response.status_code == 401
 
 
+def test_login_rate_limited() -> None:
+    from app.routers.auth import login_rate_limiter
+
+    login_rate_limiter.reset()
+    try:
+        # Username rieng de khong dung chung han muc voi cac test dang nhap khac.
+        last_status = None
+        for _ in range(login_rate_limiter.max_attempts + 3):
+            response = client.post(
+                "/api/v1/auth/login",
+                json={"username": "rl-victim", "password": "sai"},
+            )
+            last_status = response.status_code
+            if last_status == 429:
+                assert response.headers.get("Retry-After")
+                break
+        assert last_status == 429
+    finally:
+        login_rate_limiter.reset()
+
+
 def test_get_lookups() -> None:
     response = client.get("/api/v1/lookups", headers=login_headers())
     assert response.status_code == 200

@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 720
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:8081"])
 
+    # Chong brute-force /auth/login: so lan thu toi da moi IP va moi username trong cua so thoi gian.
+    login_rate_limit_max: int = 10
+    login_rate_limit_window_seconds: int = 60
+
     use_stub_gateway: bool = True
     local_app_users_file: str = "./config/local_app_users.json"
     landsoft_mapping_file: str = "./config/landsoft_mapping.local.yaml"
@@ -33,7 +37,9 @@ class Settings(BaseSettings):
     sql_database: str = ""
     sql_username: str = ""
     sql_password: str = ""
-    sql_encrypt: str = "no"
+    # Ma hoa duong truyen SQL (TLS). Giu TrustServerCertificate=yes de chap nhan cert self-signed
+    # cua SQL Server noi bo, nhung van ma hoa du lieu tren duong truyen.
+    sql_encrypt: str = "yes"
     sql_trust_server_cert: str = "yes"
 
     @field_validator("cors_origins", mode="before")
