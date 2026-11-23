@@ -58,6 +58,39 @@ def test_get_lookups() -> None:
     assert len(response.json()["districts"]) >= 1
 
 
+def test_listing_address_lookup_uses_separate_token_and_matches_full_address(monkeypatch) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(get_settings(), "landsoft_listing_lookup_token", SecretStr("test-token"))
+    matching_house = {
+        "address": "123/4A Lê Thánh Tôn",
+        "district_name": "Quận 1",
+        "ward_name": "Bến Thành",
+        "contact_phone": "0909000001",
+    }
+    monkeypatch.setattr(get_gateway(), "properties", [
+        matching_house,
+        {**matching_house, "district_name": "Quận 3", "contact_phone": "0909000002"},
+        {**matching_house, "ward_name": "Bến Nghé", "contact_phone": "0909000003"},
+        {**matching_house, "address": "123/4AB Lê Thánh Tôn", "contact_phone": "0909000004"},
+        {**matching_house, "address": "123/4A Lê Thánh Tôn Nối Dài", "contact_phone": "0909000005"},
+        {**matching_house, "house_number": "12 3/4A", "contact_phone": "0909000006"},
+    ])
+    path = "/api/v1/properties/listing-address-lookup"
+    query = {"house_number": "123/4a", "street": "Đường Lê Thánh Tôn", "district": "Q.1", "ward": "Phường Bến Thành"}
+    assert client.post(path, json=query, headers=login_headers()).status_code == 401
+
+    headers = {"Authorization": "Bearer test-token"}
+    response = client.post(path, json=query, headers=headers)
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.json() == {"match_count": 1, "ambiguous": False, "owner_phones": ["0909000001"]}
+    assert client.get("/api/v1/properties", headers=headers).status_code == 401
+
+    response = client.post(path, json={**query, "ward": ""}, headers=headers)
+    assert response.json() == {"match_count": 0, "ambiguous": True, "owner_phones": []}
+
+
 def test_property_flow() -> None:
     headers = login_headers()
     list_response = client.get("/api/v1/properties", headers=headers)

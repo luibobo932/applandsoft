@@ -85,6 +85,22 @@ class PagedPropertiesResponse(BaseModel):
     total: int
 
 
+class ListingAddressLookup(BaseModel):
+    house_number: str = Field(
+        max_length=48,
+        pattern=r"^[0-9]{1,6}[A-Za-z]?(?:[./-][0-9]{1,6}[A-Za-z]?)*(?: [Bb][Ii][Ss])?$",
+    )
+    street: str = Field(min_length=1, max_length=150)
+    district: str = Field(min_length=1, max_length=100)
+    ward: str = Field(default="", max_length=100)
+
+
+class ListingAddressMatch(BaseModel):
+    match_count: int = 0
+    ambiguous: bool = False
+    owner_phones: list[str] = Field(default_factory=list)
+
+
 class PropertyStatusPatch(BaseModel):
     status_code: str
 

@@ -4,6 +4,8 @@ from copy import deepcopy
 from datetime import UTC, datetime
 
 from app.repositories.gateway import AuthenticatedUser
+from app.repositories.property_address import match_property_address
+from app.schemas.properties import ListingAddressLookup, ListingAddressMatch
 
 
 class StubLandsoftGateway:
@@ -124,6 +126,22 @@ class StubLandsoftGateway:
 
     def get_lookups(self) -> dict:
         return deepcopy(self.lookups)
+
+    def lookup_listing_address(self, address: ListingAddressLookup) -> ListingAddressMatch:
+        house = address.house_number.replace(" ", "").casefold()
+        candidates = []
+        for prop in self.properties:
+            number, _, street = (prop.get("address") or "").partition(" ")
+            stored_number = prop.get("house_number") or number
+            if stored_number.replace(" ", "").casefold() == house:
+                candidates.append({
+                    "house_number": stored_number,
+                    "street": prop.get("street_name") or street.split(",", 1)[0],
+                    "district": prop.get("district_name"),
+                    "ward": prop.get("ward_name"),
+                    "owner_phone": prop.get("contact_phone"),
+                })
+        return match_property_address(address, candidates)
 
     def list_properties(self, filters: dict) -> tuple[list[dict], int]:
         items = deepcopy(self.properties)

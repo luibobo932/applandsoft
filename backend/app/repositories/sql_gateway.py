@@ -7,6 +7,8 @@ from typing import Any
 from app.core.landsoft_crypto import decrypt_landsoft_password
 from app.db.sqlserver import open_sql_connection
 from app.repositories.gateway import AuthenticatedUser
+from app.repositories.property_address import match_property_address
+from app.schemas.properties import ListingAddressLookup, ListingAddressMatch
 
 
 class SqlLandsoftGateway:
@@ -384,6 +386,26 @@ class SqlLandsoftGateway:
             )
             row = cursor.fetchone()
             return {"count": int(row[0] or 0), "sample": row[1]}
+
+    def lookup_listing_address(self, address: ListingAddressLookup) -> ListingAddressMatch:
+        house_number = address.house_number.replace(" ", "").upper()
+        with open_sql_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT bc.SoNha AS house_number, s.Names AS street, h.TenHuyen AS district, x.TenXa AS ward,
+                       kh.DiDong AS owner_phone, kh.DiDong2 AS owner_phone2
+                FROM dbo.mglbcBanChoThue bc
+                JOIN dbo.Street s ON s.ID = bc.StreetID
+                JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
+                LEFT JOIN dbo.Xa x ON x.MaXa = bc.MaXa
+                LEFT JOIN dbo.KhachHang kh ON kh.MaKH = bc.MaKH
+                WHERE UPPER(REPLACE(REPLACE(bc.SoNha, N' ', N''), NCHAR(160), N'')) = ?
+                ORDER BY bc.MaBC DESC
+                """,
+                house_number,
+            )
+            return match_property_address(address, self._fetch_all_dicts(cursor))
 
     def list_customers(self, keyword: str | None, page: int, page_size: int) -> tuple[list[dict], int]:
         """Danh ba khach hang Landsoft: tim theo ten hoac SDT, phan trang."""

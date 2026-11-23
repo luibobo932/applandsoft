@@ -67,6 +67,16 @@ describe("parseChototListing — tin bot Telegram", () => {
     const { patch } = parseChototListing(message, lookups);
     expect(patch.title).toBe("Bán nhà hẻm xe hơi Huỳnh Mẫn Đạt");
   });
+
+  it("khong dien so cu tu dong doi chieu Landsoft", () => {
+    const withLandsoft = message.replace(
+      "📝 Tóm tắt:",
+      "✅ Đã nhập trong Landsoft\n📞 SĐT chủ lưu trên Landsoft: 0909000001\n📝 Tóm tắt:"
+    );
+    expect(parseChototListing(withLandsoft, lookups).patch.contact_phone).toBeUndefined();
+    const withNewPhone = withLandsoft.replace("sổ hồng riêng", "sổ hồng riêng, 0909000002");
+    expect(parseChototListing(withNewPhone, lookups).patch.contact_phone).toBe("0909000002");
+  });
 });
 
 describe("parseChototListing — tin rao tu do", () => {

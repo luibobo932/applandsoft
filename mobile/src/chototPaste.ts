@@ -56,6 +56,16 @@ function stripAccents(s: string): string {
     .trim();
 }
 
+function isLandsoftLookupLine(line: string): boolean {
+  const label = stripAccents(line).replace(/^[^a-z0-9]+/, "");
+  return (
+    label === "da nhap trong landsoft" ||
+    label === "chua doi chieu duoc landsoft" ||
+    label.startsWith("sdt chu luu tren landsoft:") ||
+    label.startsWith("landsoft co dia chi trung o nhieu phuong.")
+  );
+}
+
 // "5,2" / "5.2" / "1.250" -> so thap phan kieu Viet
 function parseViNumber(raw: string): number {
   let s = raw.trim();
@@ -160,6 +170,7 @@ export function parseChototListing(
   text: string,
   lookups: LookupCollections
 ): ChototParseResult {
+  text = (text || "").split(/\r?\n/).filter((line) => !isLandsoftLookupLine(line)).join("\n");
   const patch: Partial<PropertyCreatePayload> = {};
   const filled: string[] = [];
   const rawLines = (text || "").split(/\r?\n/).map((line) => line.trim());
@@ -552,6 +563,7 @@ export function splitBatchListings(text: string): string[] {
   };
 
   for (const rawLine of (text || "").split(/\r?\n/)) {
+    if (isLandsoftLookupLine(rawLine)) continue;
     const trimmed = rawLine.trim();
     const norm = stripAccents(trimmed).replace(/^[^a-z0-9]+/, "");
     if (TELEGRAM_MSG_HEADER.test(trimmed) || norm === "nha moi" || norm === "tin moi") {
