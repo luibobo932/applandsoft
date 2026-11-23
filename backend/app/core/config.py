@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:8081"])
 
     use_stub_gateway: bool = True
+    landsoft_listing_lookup_token: SecretStr = SecretStr("")
     local_app_users_file: str = "./config/local_app_users.json"
     landsoft_mapping_file: str = "./config/landsoft_mapping.local.yaml"
     discovery_output_dir: str = "./data/discovery"

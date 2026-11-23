@@ -1,8 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from secrets import compare_digest
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from app.core.config import get_settings
 from app.repositories.gateway import get_gateway
 from app.schemas.common import ActionResponse
 from app.schemas.properties import (
+    ListingAddressLookup,
+    ListingAddressMatch,
     PagedPropertiesResponse,
     PropertyCreateRequest,
     PropertyDetail,
@@ -15,6 +21,7 @@ from app.services.audit import log_action
 from app.services.landsoft import current_user, property_or_404
 
 router = APIRouter(tags=["properties"])
+listing_lookup_bearer = HTTPBearer(auto_error=False)
 
 
 @router.get("/properties", response_model=PagedPropertiesResponse)
@@ -67,6 +74,26 @@ def check_phone(phone: str, _user=Depends(current_user)) -> dict:
     Giong Landsoft 'Số di động đã có trong hệ thống'. Tra ve them ten chu nha."""
     result = get_gateway().find_owner_by_phone(phone)
     return {"exists": result["count"] > 0, "count": result["count"], "owner_name": result.get("owner_name")}
+
+
+@router.post("/properties/listing-address-lookup", response_model=ListingAddressMatch)
+def lookup_listing_address(
+    address: ListingAddressLookup,
+    response: Response,
+    credentials: HTTPAuthorizationCredentials | None = Depends(listing_lookup_bearer),
+) -> ListingAddressMatch:
+    """Tra số chủ theo địa chỉ cho bot Telegram bằng token chỉ dành cho chức năng này."""
+    expected = get_settings().landsoft_listing_lookup_token.get_secret_value()
+    if not expected:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Chưa bật tra cứu địa chỉ")
+    if credentials is None or not compare_digest(credentials.credentials.encode(), expected.encode()):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token tra cứu không hợp lệ",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    response.headers["Cache-Control"] = "no-store"
+    return get_gateway().lookup_listing_address(address)
 
 
 @router.get("/streets")

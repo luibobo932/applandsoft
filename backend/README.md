@@ -60,6 +60,10 @@ Health check:
 GET /health
 ```
 
+## Tra địa chỉ cho bot Telegram
+
+Đặt biến môi trường `LANDSOFT_LISTING_LOOKUP_TOKEN` trên backend, rồi đặt cùng giá trị trong bot. Endpoint `POST /api/v1/properties/listing-address-lookup` dùng token riêng này để tra địa chỉ và số chủ đã lưu bằng truy vấn chỉ đọc. Khi để trống biến, endpoint trả về HTTP 503.
+
 ## Discovery note
 
 Tai lieu mapping noi bo:

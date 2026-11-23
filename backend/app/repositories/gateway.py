@@ -3,6 +3,7 @@ from functools import lru_cache
 from typing import Protocol
 
 from app.core.config import get_settings
+from app.schemas.properties import ListingAddressLookup, ListingAddressMatch
 
 
 @dataclass
@@ -24,6 +25,8 @@ class LandsoftGateway(Protocol):
     def list_properties(self, filters: dict) -> tuple[list[dict], int]: ...
 
     def get_property(self, landsoft_id: int) -> dict | None: ...
+
+    def lookup_listing_address(self, address: ListingAddressLookup) -> ListingAddressMatch: ...
 
     def update_property_status(self, landsoft_id: int, status_code: str, actor: AuthenticatedUser) -> dict: ...
 
