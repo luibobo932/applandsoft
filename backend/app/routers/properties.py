@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import get_settings
+from app.core.github_oidc import is_trusted_listing_workflow
 from app.repositories.gateway import get_gateway
 from app.schemas.common import ActionResponse
 from app.schemas.properties import (
@@ -83,10 +84,16 @@ def lookup_listing_address(
     credentials: HTTPAuthorizationCredentials | None = Depends(listing_lookup_bearer),
 ) -> ListingAddressMatch:
     """Tra số chủ theo địa chỉ cho bot Telegram bằng token chỉ dành cho chức năng này."""
-    expected = get_settings().landsoft_listing_lookup_token.get_secret_value()
-    if not expected:
+    settings = get_settings()
+    expected = settings.landsoft_listing_lookup_token.get_secret_value()
+    trusted_workflow = settings.landsoft_listing_trusted_github_workflow
+    if not expected and not trusted_workflow:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Chưa bật tra cứu địa chỉ")
-    if credentials is None or not compare_digest(credentials.credentials.encode(), expected.encode()):
+    token = credentials.credentials if credentials else ""
+    if not token or not (
+        (expected and compare_digest(token.encode(), expected.encode()))
+        or (trusted_workflow and is_trusted_listing_workflow(token, trusted_workflow))
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token tra cứu không hợp lệ",
