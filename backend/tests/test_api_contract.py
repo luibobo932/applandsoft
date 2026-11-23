@@ -74,6 +74,7 @@ def test_listing_address_lookup_uses_separate_token_and_matches_full_address(mon
         {**matching_house, "ward_name": "Bến Nghé", "contact_phone": "0909000003"},
         {**matching_house, "address": "123/4AB Lê Thánh Tôn", "contact_phone": "0909000004"},
         {**matching_house, "address": "123/4A Lê Thánh Tôn Nối Dài", "contact_phone": "0909000005"},
+        {**matching_house, "house_number": "12 3/4A", "contact_phone": "0909000006"},
     ])
     path = "/api/v1/properties/listing-address-lookup"
     query = {"house_number": "123/4a", "street": "Đường Lê Thánh Tôn", "district": "Q.1", "ward": "Phường Bến Thành"}

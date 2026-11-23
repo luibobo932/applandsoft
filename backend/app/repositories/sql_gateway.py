@@ -393,7 +393,7 @@ class SqlLandsoftGateway:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT s.Names AS street, h.TenHuyen AS district, x.TenXa AS ward,
+                SELECT bc.SoNha AS house_number, s.Names AS street, h.TenHuyen AS district, x.TenXa AS ward,
                        kh.DiDong AS owner_phone, kh.DiDong2 AS owner_phone2
                 FROM dbo.mglbcBanChoThue bc
                 JOIN dbo.Street s ON s.ID = bc.StreetID

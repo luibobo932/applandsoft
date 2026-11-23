@@ -135,6 +135,7 @@ class StubLandsoftGateway:
             stored_number = prop.get("house_number") or number
             if stored_number.replace(" ", "").casefold() == house:
                 candidates.append({
+                    "house_number": stored_number,
                     "street": prop.get("street_name") or street.split(",", 1)[0],
                     "district": prop.get("district_name"),
                     "ward": prop.get("ward_name"),

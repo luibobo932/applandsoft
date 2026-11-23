@@ -29,6 +29,9 @@ def match_property_address(
     matches: list[dict] = []
     wards: set[str] = set()
     for row in candidates:
+        stored_number = re.sub(r"\s*([./-])\s*", r"\1", row["house_number"])
+        if " ".join(stored_number.split()).casefold() != address.house_number.casefold():
+            continue
         if _name_key(row.get("street"), street_prefix) != street:
             continue
         if _name_key(row.get("district"), district_prefix) != district:
