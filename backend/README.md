@@ -62,7 +62,9 @@ GET /health
 
 ## Tra địa chỉ cho bot Telegram
 
-Đặt biến môi trường `LANDSOFT_LISTING_LOOKUP_TOKEN` trên backend, rồi đặt cùng giá trị trong bot. Endpoint `POST /api/v1/properties/listing-address-lookup` dùng token riêng này để tra địa chỉ và số chủ đã lưu bằng truy vấn chỉ đọc. Khi để trống biến, endpoint trả về HTTP 503.
+Endpoint `POST /api/v1/properties/listing-address-lookup` tra địa chỉ và số chủ đã lưu bằng truy vấn chỉ đọc. Với bot chạy GitHub Actions, đặt `LANDSOFT_LISTING_TRUSTED_GITHUB_WORKFLOW` trên backend theo dạng `<repository_id>:<workflow_ref>`, gồm cả nhánh đích. Backend xác minh chữ ký và chỉ chấp nhận lần chạy theo lịch hoặc được kích hoạt thủ công bằng runner của GitHub.
+
+Với bot chạy trên laptop, đặt cùng `LANDSOFT_LISTING_LOOKUP_TOKEN` trên backend và trong `.env` của bot. Khi cả hai biến đều trống, endpoint trả về HTTP 503.
 
 ## Discovery note
 

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     use_stub_gateway: bool = True
     landsoft_listing_lookup_token: SecretStr = SecretStr("")
+    landsoft_listing_trusted_github_workflow: str = ""
     local_app_users_file: str = "./config/local_app_users.json"
     landsoft_mapping_file: str = "./config/landsoft_mapping.local.yaml"
     discovery_output_dir: str = "./data/discovery"
