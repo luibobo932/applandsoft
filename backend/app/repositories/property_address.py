@@ -8,6 +8,7 @@ from app.schemas.properties import ListingAddressLookup, ListingAddressMatch
 
 _STREET_PREFIX = r"^(?:duong\s+|d\.\s*)"
 _SOURCE_HOSTS = {"chotot.com", "www.chotot.com", "nhatot.com", "www.nhatot.com"}
+_LEGACY_SOURCE_LINE = re.compile(r"^[ \t]*Nguồn Chợ Tốt:[ \t]*(https?://\S+)[ \t]*\r?$", re.IGNORECASE | re.MULTILINE)
 
 
 def source_listing_id_from_url(value: str | None) -> str | None:
@@ -36,13 +37,22 @@ def _house_key(value: str | None) -> str:
     return " ".join(number.split()).casefold()
 
 
+def _stored_source_id(row: dict) -> str | None:
+    source_id = source_listing_id_from_url(row.get("source_url"))
+    if source_id:
+        return source_id
+    # The Windows entry form appended the original link to the description.
+    ids = {source_listing_id_from_url(link) for link in _LEGACY_SOURCE_LINE.findall(row.get("description") or "")}
+    ids.discard(None)
+    return next(iter(ids)) if len(ids) == 1 else None
+
+
 def match_property_source_link(
     address: ListingAddressLookup, candidates: Iterable[dict]
 ) -> ListingAddressMatch:
-    matches = [
-        row for row in candidates
-        if source_listing_id_from_url(row.get("source_url")) == address.source_listing_id
-    ]
+    if not address.source_listing_id:
+        return ListingAddressMatch()
+    matches = [row for row in candidates if _stored_source_id(row) == address.source_listing_id]
     if len(matches) > 1:
         return ListingAddressMatch(ambiguous=True)
     if not matches:

@@ -141,6 +141,7 @@ class StubLandsoftGateway:
                 "registered_at": prop.get("created_at"),
                 "updated_at": prop.get("updated_at"),
                 "source_url": prop.get("source_url"),
+                "description": prop.get("description"),
             })
         if address.source_listing_id:
             match = match_property_source_link(address, candidates)

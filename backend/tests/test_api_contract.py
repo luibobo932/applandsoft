@@ -157,6 +157,13 @@ def test_listing_address_lookup_can_verify_a_saved_source_link(monkeypatch) -> N
     }
     assert client.post(path, json={}, headers=headers).status_code == 422
 
+    # Older Windows imports stored a labelled URL in the listing description.
+    legacy = {**real, "source_url": None, "description": f"Nhà hẻm xe hơi.\r\n\r\nNguồn Chợ Tốt: {real['source_url']}"}
+    stores[:] = [legacy, {**legacy, "description": f"Tin tham khảo {real['source_url']}", "contact_phone": "0919000004"}]
+    assert client.post(path, json={"source_listing_id": "136025733"}, headers=headers).json() == {
+        "match_count": 1, "ambiguous": False, "owner_phones": ["0909000001"], "matched_by_source_link": True,
+    }
+
 
 def test_property_flow() -> None:
     headers = login_headers()
