@@ -140,6 +140,8 @@ class StubLandsoftGateway:
                     "district": prop.get("district_name"),
                     "ward": prop.get("ward_name"),
                     "owner_phone": prop.get("contact_phone"),
+                    "registered_at": prop.get("created_at"),
+                    "updated_at": prop.get("updated_at"),
                 })
         return match_property_address(address, candidates)
 

@@ -394,7 +394,9 @@ class SqlLandsoftGateway:
             cursor.execute(
                 """
                 SELECT bc.SoNha AS house_number, s.Names AS street, h.TenHuyen AS district, x.TenXa AS ward,
-                       kh.DiDong AS owner_phone, kh.DiDong2 AS owner_phone2
+                       kh.DiDong AS owner_phone, kh.DiDong2 AS owner_phone2,
+                       bc.NgayDK AS registered_at, bc.NgayCN AS updated_at,
+                       DATEPART(TZOFFSET, SYSDATETIMEOFFSET()) AS database_utc_offset_minutes
                 FROM dbo.mglbcBanChoThue bc
                 JOIN dbo.Street s ON s.ID = bc.StreetID
                 JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
