@@ -4,7 +4,7 @@ from copy import deepcopy
 from datetime import UTC, datetime
 
 from app.repositories.gateway import AuthenticatedUser
-from app.repositories.property_address import match_property_address
+from app.repositories.property_address import match_property_address, match_property_source_link
 from app.schemas.properties import ListingAddressLookup, ListingAddressMatch
 
 
@@ -128,21 +128,24 @@ class StubLandsoftGateway:
         return deepcopy(self.lookups)
 
     def lookup_listing_address(self, address: ListingAddressLookup) -> ListingAddressMatch:
-        house = address.house_number.replace(" ", "").casefold()
         candidates = []
         for prop in self.properties:
             number, _, street = (prop.get("address") or "").partition(" ")
             stored_number = prop.get("house_number") or number
-            if stored_number.replace(" ", "").casefold() == house:
-                candidates.append({
-                    "house_number": stored_number,
-                    "street": prop.get("street_name") or street.split(",", 1)[0],
-                    "district": prop.get("district_name"),
-                    "ward": prop.get("ward_name"),
-                    "owner_phone": prop.get("contact_phone"),
-                    "registered_at": prop.get("created_at"),
-                    "updated_at": prop.get("updated_at"),
-                })
+            candidates.append({
+                "house_number": stored_number,
+                "street": prop.get("street_name") or street.split(",", 1)[0],
+                "district": prop.get("district_name"),
+                "ward": prop.get("ward_name"),
+                "owner_phone": prop.get("contact_phone"),
+                "registered_at": prop.get("created_at"),
+                "updated_at": prop.get("updated_at"),
+                "source_url": prop.get("source_url"),
+            })
+        if address.source_listing_id:
+            match = match_property_source_link(address, candidates)
+            if match.match_count or match.ambiguous:
+                return match
         return match_property_address(address, candidates)
 
     def list_properties(self, filters: dict) -> tuple[list[dict], int]:
@@ -415,6 +418,7 @@ class StubLandsoftGateway:
             "property_type_name": prop_type_name,
             "source_code": payload["source_code"],
             "source_name": source_name,
+            "source_url": payload.get("source_url"),
             "notes": [],
         }
         if payload.get("note"):

@@ -68,6 +68,15 @@ describe("parseChototListing — tin bot Telegram", () => {
     expect(patch.title).toBe("Bán nhà hẻm xe hơi Huỳnh Mẫn Đạt");
   });
 
+  it("giu link Cho Tot hoac Nha Tot de doi chieu lai", () => {
+    const url = "https://www.nhatot.com/mua-ban-nha-dat-quan-5/136025733.htm";
+    const text = message.replace("https://www.chotot.com/abc", url);
+    expect(parseChototListing(text, lookups).patch.source_url).toBe(url);
+    expect(
+      parseChototListing(`${text}\nhttps://www.chotot.com/136025734.htm`, lookups).patch.source_url
+    ).toBeUndefined();
+  });
+
   it("khong dien so cu tu dong doi chieu Landsoft", () => {
     const withLandsoft = message.replace(
       "📝 Tóm tắt:",

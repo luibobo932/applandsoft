@@ -42,6 +42,7 @@ export const chototFieldDefaults: Partial<PropertyCreatePayload> = {
   contact_phone: "",
   description: "",
   note: "",
+  source_url: "",
   direct_owner: false,
   negotiable: false,
 };
@@ -61,6 +62,7 @@ function isLandsoftLookupLine(line: string): boolean {
   return (
     label === "da nhap trong landsoft" ||
     label === "chua doi chieu duoc landsoft" ||
+    label.startsWith("can xac minh trong landsoft:") ||
     label.startsWith("sdt chu luu tren landsoft:") ||
     label.startsWith("landsoft co dia chi trung o nhieu phuong.")
   );
@@ -176,6 +178,12 @@ export function parseChototListing(
   const rawLines = (text || "").split(/\r?\n/).map((line) => line.trim());
   const lines = rawLines.filter(Boolean);
   const normFull = stripAccents(text || "");
+  const sourceLinks = [...text.matchAll(
+    /https?:\/\/(?:www\.)?(?:chotot|nhatot)\.com\/(?:[^\s<>?#]+\/)?([0-9]{1,12})\.htm\/?(?=$|[\s?#),])/gi
+  )];
+  if (sourceLinks.length && new Set(sourceLinks.map((match) => match[1])).size === 1) {
+    patch.source_url = sourceLinks[0][0];
+  }
 
   // --- Tieu de: dong dau tien khong phai header/label/separator/link
   const isNoise = (line: string): boolean => {

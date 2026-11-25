@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class PropertySummary(BaseModel):
@@ -87,23 +87,35 @@ class PagedPropertiesResponse(BaseModel):
 
 
 class ListingAddressLookup(BaseModel):
-    house_number: str = Field(
+    source_listing_id: str | None = Field(default=None, pattern=r"^[0-9]{1,12}$")
+    house_number: str | None = Field(
+        default=None,
         max_length=48,
         pattern=r"^[0-9]{1,6}[A-Za-z]?(?:[./-][0-9]{1,6}[A-Za-z]?)*(?: [Bb][Ii][Ss])?$",
     )
-    street: str = Field(min_length=1, max_length=150)
-    district: str = Field(min_length=1, max_length=100)
+    street: str | None = Field(default=None, min_length=1, max_length=150)
+    district: str | None = Field(default=None, min_length=1, max_length=100)
     ward: str = Field(default="", max_length=100)
     ward_aliases: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(
         default_factory=list, max_length=2
     )
     include_record_times: bool = False
 
+    @model_validator(mode="after")
+    def require_lookup_key(self) -> "ListingAddressLookup":
+        address_fields = (self.house_number, self.street, self.district)
+        if any(address_fields) and not all(address_fields):
+            raise ValueError("Cần đủ số nhà, đường và quận để đối chiếu địa chỉ.")
+        if not self.source_listing_id and not all(address_fields):
+            raise ValueError("Cần mã tin gốc hoặc địa chỉ.")
+        return self
+
 
 class ListingAddressMatch(BaseModel):
     match_count: int = 0
     ambiguous: bool = False
     owner_phones: list[str] = Field(default_factory=list)
+    matched_by_source_link: bool | None = None
     first_registered_at: datetime | None = None
     last_updated_at: datetime | None = None
     database_utc_offset_minutes: int | None = None
@@ -144,6 +156,7 @@ class PropertyCreateRequest(BaseModel):
     direct_owner: bool = False
     description: str | None = None
     note: str | None = None
+    source_url: str | None = Field(default=None, max_length=512)
     listing_type: str = "ban"
     # Cac truong bo sung theo form Landsoft that
     owner_phone2: str | None = None

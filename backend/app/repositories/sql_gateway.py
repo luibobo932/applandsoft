@@ -7,7 +7,11 @@ from typing import Any
 from app.core.landsoft_crypto import decrypt_landsoft_password
 from app.db.sqlserver import open_sql_connection
 from app.repositories.gateway import AuthenticatedUser
-from app.repositories.property_address import match_property_address
+from app.repositories.property_address import (
+    match_property_address,
+    match_property_source_link,
+    source_listing_id_from_url,
+)
 from app.schemas.properties import ListingAddressLookup, ListingAddressMatch
 
 
@@ -388,21 +392,40 @@ class SqlLandsoftGateway:
             return {"count": int(row[0] or 0), "sample": row[1]}
 
     def lookup_listing_address(self, address: ListingAddressLookup) -> ListingAddressMatch:
-        house_number = address.house_number.replace(" ", "").upper()
+        base_query = """
+            SELECT bc.LinkSource AS source_url, bc.SoNha AS house_number, s.Names AS street,
+                   h.TenHuyen AS district, x.TenXa AS ward,
+                   kh.DiDong AS owner_phone, kh.DiDong2 AS owner_phone2,
+                   bc.NgayDK AS registered_at, bc.NgayCN AS updated_at,
+                   DATEPART(TZOFFSET, SYSDATETIMEOFFSET()) AS database_utc_offset_minutes
+            FROM dbo.mglbcBanChoThue bc
+            LEFT JOIN dbo.Street s ON s.ID = bc.StreetID
+            LEFT JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
+            LEFT JOIN dbo.Xa x ON x.MaXa = bc.MaXa
+            LEFT JOIN dbo.KhachHang kh ON kh.MaKH = bc.MaKH
+        """
         with open_sql_connection() as conn:
             cursor = conn.cursor()
+            if address.source_listing_id:
+                cursor.execute(
+                    f"""
+                    {base_query}
+                    WHERE bc.LinkSource IS NOT NULL AND CAST(bc.LinkSource AS nvarchar(max)) LIKE ?
+                    ORDER BY bc.MaBC DESC
+                    """,
+                    f"%/{address.source_listing_id}.htm%",
+                )
+                match = match_property_source_link(address, self._fetch_all_dicts(cursor))
+                if match.match_count or match.ambiguous:
+                    return match
+            if not address.house_number:
+                return ListingAddressMatch()
+            house_number = "".join(address.house_number.replace("\u200b", "").split()).upper()
             cursor.execute(
-                """
-                SELECT bc.SoNha AS house_number, s.Names AS street, h.TenHuyen AS district, x.TenXa AS ward,
-                       kh.DiDong AS owner_phone, kh.DiDong2 AS owner_phone2,
-                       bc.NgayDK AS registered_at, bc.NgayCN AS updated_at,
-                       DATEPART(TZOFFSET, SYSDATETIMEOFFSET()) AS database_utc_offset_minutes
-                FROM dbo.mglbcBanChoThue bc
-                JOIN dbo.Street s ON s.ID = bc.StreetID
-                JOIN dbo.Huyen h ON h.MaHuyen = bc.MaHuyen
-                LEFT JOIN dbo.Xa x ON x.MaXa = bc.MaXa
-                LEFT JOIN dbo.KhachHang kh ON kh.MaKH = bc.MaKH
-                WHERE UPPER(REPLACE(REPLACE(bc.SoNha, N' ', N''), NCHAR(160), N'')) = ?
+                f"""
+                {base_query}
+                WHERE UPPER(REPLACE(REPLACE(REPLACE(REPLACE(bc.SoNha, N' ', N''), NCHAR(160), N''),
+                           NCHAR(9), N''), NCHAR(8203), N'')) = ?
                 ORDER BY bc.MaBC DESC
                 """,
                 house_number,
@@ -1038,6 +1061,8 @@ class SqlLandsoftGateway:
         house_number = self._extract_house_number(address_text, payload.get("street_name"))
         description = (payload.get("description") or "").strip()
         note = (payload.get("note") or "").strip()
+        source_id = source_listing_id_from_url(payload.get("source_url"))
+        source_url = f"https://www.chotot.com/mua-ban-nha/{source_id}.htm" if source_id else None
         # Phi moi gioi: mac dinh 1% gia ban (user co the doi tren form nhu Landsoft)
         ty_le_mg = float(payload.get("brokerage_percent") or 1.0)
         phi_mg = round(total_price * ty_le_mg / 100.0, 4)
@@ -1157,7 +1182,7 @@ class SqlLandsoftGateway:
                     "",
                     street_id,
                     int(payload["ward_code"]),
-                    None,
+                    source_url,
                     (payload.get("title") or "").strip(),
                     None,
                     1 if payload.get("has_basement") else 0,
