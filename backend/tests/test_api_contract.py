@@ -123,6 +123,41 @@ def test_listing_address_lookup_can_use_public_ward_alias(monkeypatch) -> None:
     }
 
 
+def test_listing_address_lookup_can_verify_a_saved_source_link(monkeypatch) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(get_settings(), "landsoft_listing_lookup_token", SecretStr("test-token"))
+    real = {
+        "house_number": "243/1/32",
+        "street_name": "Tô Hiến Thành",
+        "district_name": "Quận 10",
+        "ward_name": "Phường 13",
+        "source_url": "https://www.nhatot.com/mua-ban-nha-dat/136025733.htm?ref=telegram",
+        "contact_phone": "0909000001",
+    }
+    stores = [
+        real,
+        {**real, "source_url": "https://www.nhatot.com.example.org/136025733.htm", "contact_phone": "0919000002"},
+        {**real, "source_url": "https://www.chotot.com/1136025733.htm", "contact_phone": "0919000003"},
+    ]
+    monkeypatch.setattr(get_gateway(), "properties", stores)
+    path = "/api/v1/properties/listing-address-lookup"
+    headers = {"Authorization": "Bearer test-token"}
+    result = client.post(path, json={"source_listing_id": "136025733"}, headers=headers)
+    assert result.json() == {
+        "match_count": 1, "ambiguous": False, "owner_phones": ["0909000001"], "matched_by_source_link": True,
+    }
+    conflict = client.post(path, json={
+        "source_listing_id": "136025733", "house_number": "243/1/33", "street": "Tô Hiến Thành", "district": "Quận 10"
+    }, headers=headers)
+    assert conflict.json() == {"match_count": 0, "ambiguous": True, "owner_phones": []}
+    stores.append({**real, "contact_phone": "0919000004"})
+    assert client.post(path, json={"source_listing_id": "136025733"}, headers=headers).json() == {
+        "match_count": 0, "ambiguous": True, "owner_phones": [],
+    }
+    assert client.post(path, json={}, headers=headers).status_code == 422
+
+
 def test_property_flow() -> None:
     headers = login_headers()
     list_response = client.get("/api/v1/properties", headers=headers)
@@ -150,7 +185,10 @@ def test_property_flow() -> None:
     assert note_response.status_code == 200
 
 
-def test_create_property_and_activity() -> None:
+def test_create_property_and_activity(monkeypatch) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(get_settings(), "landsoft_listing_lookup_token", SecretStr("test-token"))
     headers = login_headers()
     create_response = client.post(
         "/api/v1/properties",
@@ -168,10 +206,20 @@ def test_create_property_and_activity() -> None:
             "price": 12.5,
             "area": 55,
             "description": "Tin tạo từ API test",
+            "source_url": "https://www.nhatot.com/mua-ban-nha-dat/136025734.htm",
         },
     )
     assert create_response.status_code == 200
     assert create_response.json()["landsoft_id"] is not None
+
+    source_match = client.post(
+        "/api/v1/properties/listing-address-lookup",
+        headers={"Authorization": "Bearer test-token"},
+        json={"source_listing_id": "136025734"},
+    )
+    assert source_match.json() == {
+        "match_count": 1, "ambiguous": False, "owner_phones": ["0909000999"], "matched_by_source_link": True,
+    }
 
     activity_response = client.get("/api/v1/activity/recent", headers=headers)
     assert activity_response.status_code == 200

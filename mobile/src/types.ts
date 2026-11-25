@@ -129,6 +129,7 @@ export type PropertyCreatePayload = {
   property_type_code: string;
   status_code: string;
   source_code: string;
+  source_url?: string;
   street_name?: string;
   owner_name: string;
   contact_phone: string;
