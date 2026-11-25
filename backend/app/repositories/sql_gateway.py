@@ -393,7 +393,7 @@ class SqlLandsoftGateway:
 
     def lookup_listing_address(self, address: ListingAddressLookup) -> ListingAddressMatch:
         base_query = """
-            SELECT bc.LinkSource AS source_url, bc.SoNha AS house_number, s.Names AS street,
+            SELECT bc.LinkSource AS source_url, bc.DienGiai AS description, bc.SoNha AS house_number, s.Names AS street,
                    h.TenHuyen AS district, x.TenXa AS ward,
                    kh.DiDong AS owner_phone, kh.DiDong2 AS owner_phone2,
                    bc.NgayDK AS registered_at, bc.NgayCN AS updated_at,
@@ -410,10 +410,12 @@ class SqlLandsoftGateway:
                 cursor.execute(
                     f"""
                     {base_query}
-                    WHERE bc.LinkSource IS NOT NULL AND CAST(bc.LinkSource AS nvarchar(max)) LIKE ?
+                    WHERE CAST(bc.LinkSource AS nvarchar(max)) LIKE ?
+                       OR bc.DienGiai LIKE ?
                     ORDER BY bc.MaBC DESC
                     """,
                     f"%/{address.source_listing_id}.htm%",
+                    f"%Nguồn Chợ Tốt:%/{address.source_listing_id}.htm%",
                 )
                 match = match_property_source_link(address, self._fetch_all_dicts(cursor))
                 if match.match_count or match.ambiguous:
