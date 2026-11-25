@@ -91,6 +91,38 @@ def test_listing_address_lookup_uses_separate_token_and_matches_full_address(mon
     assert response.json() == {"match_count": 0, "ambiguous": True, "owner_phones": []}
 
 
+def test_listing_address_lookup_can_use_public_ward_alias(monkeypatch) -> None:
+    from datetime import datetime
+
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(get_settings(), "landsoft_listing_lookup_token", SecretStr("test-token"))
+    monkeypatch.setattr(get_gateway(), "properties", [
+        {
+            "address": "243/1/32 Tô Hiến Thành",
+            "district_name": "Quận 10",
+            "ward_name": "Phường 13",
+            "contact_phone": "0909000001",
+            "created_at": datetime(2026, 11, 24, 8, 0),
+        },
+    ])
+    path = "/api/v1/properties/listing-address-lookup"
+    headers = {"Authorization": "Bearer test-token"}
+    address = {
+        "house_number": "243/1/32", "street": "Đường Tô Hiến Thành",
+        "district": "Quận 10", "ward": "Phường Hòa Hưng",
+    }
+    conflict = client.post(path, json=address, headers=headers).json()
+    assert conflict == {"match_count": 0, "ambiguous": True, "owner_phones": []}
+    match = client.post(
+        path, json={**address, "ward_aliases": ["Phường 13"], "include_record_times": True}, headers=headers,
+    ).json()
+    assert match == {
+        "match_count": 1, "ambiguous": False, "owner_phones": ["0909000001"],
+        "first_registered_at": "2026-11-24T08:00:00",
+    }
+
+
 def test_property_flow() -> None:
     headers = login_headers()
     list_response = client.get("/api/v1/properties", headers=headers)

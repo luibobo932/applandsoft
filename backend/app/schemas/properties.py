@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
@@ -93,12 +94,19 @@ class ListingAddressLookup(BaseModel):
     street: str = Field(min_length=1, max_length=150)
     district: str = Field(min_length=1, max_length=100)
     ward: str = Field(default="", max_length=100)
+    ward_aliases: list[Annotated[str, Field(min_length=1, max_length=100)]] = Field(
+        default_factory=list, max_length=2
+    )
+    include_record_times: bool = False
 
 
 class ListingAddressMatch(BaseModel):
     match_count: int = 0
     ambiguous: bool = False
     owner_phones: list[str] = Field(default_factory=list)
+    first_registered_at: datetime | None = None
+    last_updated_at: datetime | None = None
+    database_utc_offset_minutes: int | None = None
 
 
 class PropertyStatusPatch(BaseModel):

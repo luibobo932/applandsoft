@@ -1,6 +1,7 @@
 import re
 import unicodedata
 from collections.abc import Iterable
+from datetime import datetime
 
 from app.schemas.properties import ListingAddressLookup, ListingAddressMatch
 
@@ -23,11 +24,11 @@ def match_property_address(
     street = _name_key(address.street, street_prefix)
     district = _name_key(address.district, district_prefix)
     ward = _name_key(address.ward, ward_prefix)
+    aliases = {_name_key(name, ward_prefix) for name in address.ward_aliases} - {"", ward}
     if not street or not district:
         return ListingAddressMatch()
 
     matches: list[dict] = []
-    wards: set[str] = set()
     for row in candidates:
         stored_number = re.sub(r"\s*([./-])\s*", r"\1", row["house_number"])
         if " ".join(stored_number.split()).casefold() != address.house_number.casefold():
@@ -36,12 +37,17 @@ def match_property_address(
             continue
         if _name_key(row.get("district"), district_prefix) != district:
             continue
-        row_ward = _name_key(row.get("ward"), ward_prefix)
-        if ward and row_ward != ward:
-            continue
         matches.append(row)
-        wards.add(row_ward)
 
+    if ward and matches:
+        # Ưu tiên phường tra trực tiếp, sau đó mới dùng tên khác do tin cung cấp.
+        exact = [row for row in matches if _name_key(row.get("ward"), ward_prefix) == ward]
+        alternate = [row for row in matches if _name_key(row.get("ward"), ward_prefix) in aliases]
+        if not exact and not alternate:
+            return ListingAddressMatch(ambiguous=True)
+        matches = exact or alternate
+
+    wards = {_name_key(row.get("ward"), ward_prefix) for row in matches}
     if len(wards) > 1:
         return ListingAddressMatch(ambiguous=True)
 
@@ -53,4 +59,11 @@ def match_property_address(
             if 8 <= len(digits) <= 15 and re.fullmatch(r"\+?[0-9(). -]+", phone):
                 key = "0" + digits[2:] if digits.startswith("84") else digits
                 phones.setdefault(key, phone)
-    return ListingAddressMatch(match_count=len(matches), owner_phones=list(phones.values()))
+    result = ListingAddressMatch(match_count=len(matches), owner_phones=list(phones.values()))
+    if address.include_record_times and matches:
+        registered = [row["registered_at"] for row in matches if isinstance(row.get("registered_at"), datetime)]
+        updated = [row["updated_at"] for row in matches if isinstance(row.get("updated_at"), datetime)]
+        result.first_registered_at = min(registered, default=None)
+        result.last_updated_at = max(updated, default=None)
+        result.database_utc_offset_minutes = matches[0].get("database_utc_offset_minutes")
+    return result

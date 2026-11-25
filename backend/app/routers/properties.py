@@ -77,7 +77,9 @@ def check_phone(phone: str, _user=Depends(current_user)) -> dict:
     return {"exists": result["count"] > 0, "count": result["count"], "owner_name": result.get("owner_name")}
 
 
-@router.post("/properties/listing-address-lookup", response_model=ListingAddressMatch)
+@router.post(
+    "/properties/listing-address-lookup", response_model=ListingAddressMatch, response_model_exclude_none=True
+)
 def lookup_listing_address(
     address: ListingAddressLookup,
     response: Response,
